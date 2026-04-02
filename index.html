@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Percy -- Permit Matrix Tool</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:system-ui,sans-serif;}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useMemo}=React;
+const GE="Emergency standby (100 hrs/yr max)";
+const GN="Non-emergency / BTM / continuous";
+const ADB={Indiana:{Sullivan:{s:"Attainment zone (250 TPY PSD threshold)",n:"Sullivan County, IN: Attainment. Verify with IDEM OAQ."},Marion:{s:"Attainment zone (250 TPY PSD threshold)",n:"Marion County, IN: Attainment. Previously marginal non-attainment; redesignated."},Lake:{s:"Non-attainment zone (100 TPY NSR threshold)",n:"Lake County, IN: Non-attainment PM2.5 and ozone. 100 TPY threshold."},Allen:{s:"Attainment zone (250 TPY PSD threshold)",n:"Allen County, IN: Attainment."},Vigo:{s:"Attainment zone (250 TPY PSD threshold)",n:"Vigo County, IN: Attainment."},Hendricks:{s:"Attainment zone (250 TPY PSD threshold)",n:"Hendricks County, IN: Attainment."},Monroe:{s:"Attainment zone (250 TPY PSD threshold)",n:"Monroe County, IN: Attainment."}},Texas:{Cameron:{s:"Attainment zone (250 TPY PSD threshold)",n:"Cameron County, TX: Attainment."},Harris:{s:"Non-attainment zone (100 TPY NSR threshold)",n:"Harris County, TX: Non-attainment ozone (Serious, 2015 NAAQS)."},Travis:{s:"Attainment zone (250 TPY PSD threshold)",n:"Travis County, TX: Attainment."},Tarrant:{s:"Non-attainment zone (100 TPY NSR threshold)",n:"Tarrant County, TX: Non-attainment ozone DFW."},Dallas:{s:"Non-attainment zone (100 TPY NSR threshold)",n:"Dallas County, TX: Non-attainment ozone (Severe). NOx Title V threshold 25 tpy."},Williamson:{s:"Attainment zone (250 TPY PSD threshold)",n:"Williamson County, TX: Attainment."},Bexar:{s:"Attainment zone (250 TPY PSD threshold)",n:"Bexar County, TX: Attainment."},Collin:{s:"Non-attainment zone (100 TPY NSR threshold)",n:"Collin County, TX: Non-attainment ozone DFW."}},Oklahoma:{Okmulgee:{s:"Attainment zone (250 TPY PSD threshold)",n:"Okmulgee County, OK: Attainment."},Tulsa:{s:"Non-attainment zone (100 TPY NSR threshold)",n:"Tulsa County, OK: Marginal non-attainment ozone."},Creek:{s:"Attainment zone (250 TPY PSD threshold)",n:"Creek County, OK: Attainment."},Muskogee:{s:"Attainment zone (250 TPY PSD threshold)",n:"Muskogee County, OK: Attainment."},Rogers:{s:"Non-attainment zone (100 TPY NSR threshold)",n:"Rogers County, OK: Included in Tulsa non-attainment area."}},Alabama:{Tuscaloosa:{s:"Attainment zone (250 TPY PSD threshold)",n:"Tuscaloosa County, AL: Attainment."},Bibb:{s:"Attainment zone (250 TPY PSD threshold)",n:"Bibb County, AL: Attainment."},Jefferson:{s:"Non-attainment zone (100 TPY NSR threshold)",n:"Jefferson County, AL: Non-attainment PM2.5."},Madison:{s:"Attainment zone (250 TPY PSD threshold)",n:"Madison County, AL: Attainment."},Shelby:{s:"Non-attainment zone (100 TPY NSR threshold)",n:"Shelby County, AL: Birmingham PM2.5 non-attainment area."}},"New York":{Erie:{s:"Non-attainment zone (100 TPY NSR threshold)",n:"Erie County, NY: Marginal non-attainment ozone."},Niagara:{s:"Attainment zone (250 TPY PSD threshold)",n:"Niagara County, NY: Attainment."},Saratoga:{s:"Attainment zone (250 TPY PSD threshold)",n:"Saratoga County, NY: Attainment."},Orange:{s:"Non-attainment zone (100 TPY NSR threshold)",n:"Orange County, NY: Marginal non-attainment ozone."}},Arkansas:{Benton:{s:"Attainment zone (250 TPY PSD threshold)",n:"Benton County, AR: Attainment."},Washington:{s:"Attainment zone (250 TPY PSD threshold)",n:"Washington County, AR: Attainment."}},Virginia:{Fairfax:{s:"Non-attainment zone (100 TPY NSR threshold)",n:"Fairfax County, VA: Non-attainment ozone DC-MD-VA area."},Loudoun:{s:"Non-attainment zone (100 TPY NSR threshold)",n:"Loudoun County, VA: Non-attainment ozone. Major data center market."},"Prince William":{s:"Non-attainment zone (100 TPY NSR threshold)",n:"Prince William County, VA: Non-attainment ozone DC metro."}}};
+const AG={Indiana:{air:"IDEM OAQ",dot:"INDOT",npdes:"IDEM",usace:"USACE Louisville or Chicago District",shpo:"IDNR DHPA",brownfield:"IDEM VRP"},Texas:{air:"TCEQ Air Permits",dot:"TxDOT",npdes:"TCEQ (TPDES)",usace:"USACE Fort Worth or Galveston District",shpo:"Texas Historical Commission",brownfield:"TCEQ VCP"},Oklahoma:{air:"ODEQ Air Quality",dot:"ODOT",npdes:"ODEQ (OPDES)",usace:"USACE Tulsa District",shpo:"Oklahoma SHPO",brownfield:"ODEQ VCP"},Alabama:{air:"ADEM Air Division",dot:"ALDOT",npdes:"ADEM",usace:"USACE Mobile District",shpo:"Alabama SHPO AHC",brownfield:"ADEM Brownfields"},"New York":{air:"NYSDEC Air Resources",dot:"NYSDOT",npdes:"NYSDEC (SPDES)",usace:"USACE New York or Buffalo District",shpo:"NY SHPO OPRHP",brownfield:"NYSDEC BCP"},Arkansas:{air:"ADEQ Air Division",dot:"ARDOT",npdes:"ADEQ CGP",usace:"USACE Little Rock District",shpo:"Arkansas SHPO AHPP",brownfield:"ADEQ VCAP"},Virginia:{air:"VADEQ Office of Air Quality",dot:"VDOT",npdes:"VADEQ (VPDES)",usace:"USACE Norfolk or Baltimore District",shpo:"Virginia SHPO DHR",brownfield:"VADEQ VRP"},_:{air:"State Air Agency",dot:"State DOT",npdes:"State NPDES",usace:"USACE",shpo:"State SHPO",brownfield:"State Brownfield Program"}};
+const SNOTES={Indiana:"BUILDING CODE: 675 IAC 13 (IBC 2021 base, eff. Dec 13 2021). Mandatory statewide. IDHS Design Release (675 IAC 12-6) required before construction.\n\nSULLIVAN COUNTY: NO land use/zoning regulations for unincorporated sites. Bennett Cemetery (CR-77-36) within Project Nova footprint -- IC 14-21-1 requires Cemetery Development Plan and DHPA permit for grading within 100 ft.\n\nCSGP: NOI via IDEM ePortal -- construction authorized 48 HOURS after submission.\nDRAINAGE: County Drainage Board review (IC 36-9-27) required before grading near regulated drains.\nINHDC: Indiana Bat (E, S1), multiple S1/S2 mussels, Bald Eagle in Sullivan County per 2025 list. Winter tree clearing (Oct 1 - Mar 31) recommended.",Texas:"BUILDING CODE: Texas LGC Chapter 233 PROHIBITS counties from requiring building permits in unincorporated areas. NEC 2020 statewide.\n\nEMERGENCY GENERATORS: PBR 106.511 self-implementing -- NO registration, NO fee. Max 876 hrs/yr.\nNON-EMERGENCY/BTM: Standard Permit for EGUs (30 TAC 116.601-615). STEERS account required.\nDALLAS COUNTY: NOx Title V threshold lowered to 25 tpy effective Nov 7 2022.",Alabama:"BUILDING CODE CRITICAL: Alabama State Building Code applies ONLY to public buildings -- NOT private data centers. State Fire Marshal (Ala. Code 36-19-1) is default AHJ where no local official exists.\n\nNPDES CGP: ADEM fee $1,385, 30-day review, CBMPP required before NOI.\nWATER RIGHTS: ADECA Certificate of Use required for withdrawals >= 100,000 GPD.",Oklahoma:"BUILDING CODE: OUBCC IBC 2018 mandatory minimum (OAC Title 748), eff. Sept 14 2021. NEC 2023 eff. Sept 14 2024.\n\nTRIBAL JURISDICTION: McGirt v. Oklahoma (2020). Eastern Oklahoma within former Indian Territory boundaries may be subject to tribal jurisdiction.","New York":"BUILDING CODE: Building Code of New York State 2025 (IBC 2024 base).\n\nSEQRA: NY ECL Article 8 required for all discretionary local approvals. Large data centers are Type I actions -- full EAF or EIS likely required. EIS adds 12-24 months.",Arkansas:"BUILDING CODE: Arkansas Fire Prevention Code Vol. II (IBC 2021 base, eff. Jan 1 2023) enforced by State Fire Marshal.",Virginia:"BUILDING CODE: 13 VAC 5-63 (Virginia USBC, 2018 IBC base).\n\nLOUDOUN/PRINCE WILLIAM: Tier I-IV data center classifications with specific design, setback, and noise requirements."};
+const GC_IDS=new Set(["l_building","l_mep","l_temp_elec","l_hv_work","l_fire_s","l_fire_a","l_spec","l_gen","l_fuel","l_demo","l_grading","l_drainage","l_co","l_rua"]);
+const OPS_IDS=new Set(["f_spcc","f_rcra","f_608","f_pcb","s_epcra","f_nsps","tx_pbr"]);
+const STATES=["Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico","New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont","Virginia","Washington","West Virginia","Wisconsin","Wyoming"];
+const INIT={name:"",state:"Indiana",county:"Sullivan",site_cs:"",building_cs:"",acres:"120",sf:"",floodZone:"Zone X (Minimal)",hasFloodway:false,brownfield:"No",zoning:"By-Right Data Center",cultural:"TBD",airport:"None Within 5 mi",receptors:"None",rock:"TBD",wetlands:false,hasStream:false,species:false,hasDemo:false,hasPre1978:false,traffic:true,waterMainReloc:false,power:"Dedicated Utility Substation",txV:"138 kV",waterSewer:"TBD",waterSource:"TBD",hasCoolingTower:false,processDischarge:"TBD",gasExtension:false,railroadCrossing:false,bess:"BESS",scopeSite:true,scopeBuilding:true,scopeSubstation:false,scopeOps:true,genOn:true,genCount:"2",genKW:"1500",genFuel:"Diesel",dieselGal:"",genUsage:GE,attainment:"TBD -- confirm with air quality consultant",btmOn:false,btmMW:"200",btmFuel:"Natural gas",hasDewater:false,hasUST:false,hasOutdoorIndustrial:false,hasRO:false,hasLargeCoolant:true,hasPCBRisk:false};
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x;};
+const fmtD=d=>d?d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):"--";
+function getLink(reg){
+  if(!reg)return null;
+  const pt=reg.match(/(\d{1,2})\s+CFR\s+Part\s+(\d+)/i);if(pt)return`https://www.ecfr.gov/current/title-${pt[1]}/part-${pt[2]}`;
+  if(/30\s+TAC\s+106\.511/i.test(reg))return"https://www.tceq.texas.gov/permitting/air/permitbyrule/pbr-index.html";
+  if(/30\s+TAC\s+116/i.test(reg))return"https://www.tceq.texas.gov/permitting/air/standard-permits";
+  if(/675\s+IAC/i.test(reg))return"https://www.in.gov/dhs/boards-and-commissions/fpbsc-rules/";
+  if(/327\s+IAC\s+15-5/i.test(reg))return"https://www.in.gov/idem/stormwater/construction-stormwater/";
+  if(/IC\s+14-21/i.test(reg))return"https://iga.in.gov/laws/2024/ic/titles/14/articles/21/";
+  if(/IC\s+14-22/i.test(reg))return"https://www.in.gov/dnr/nature/indiana-natural-heritage-data-center/";
+  if(/NFPA\s+855/i.test(reg))return"https://www.nfpa.org/codes-and-standards/nfpa-855";
+  if(/NFPA\s+13/i.test(reg))return"https://www.nfpa.org/codes-and-standards/nfpa-13";
+  if(/NFPA\s+72/i.test(reg))return"https://www.nfpa.org/codes-and-standards/nfpa-72";
+  if(/CWA.*404/i.test(reg))return"https://www.epa.gov/cwa-404";
+  if(/44\s+CFR/i.test(reg))return"https://www.fema.gov/flood-maps/change-your-flood-zone";
+  if(/ESA.*Section.*7/i.test(reg))return"https://www.fws.gov/service/section-7-consultation";
+  if(/NHPA.*106/i.test(reg))return"https://www.achp.gov/protect-historic-properties/section-106-process/introduction-section-106";
+  if(/McGirt/i.test(reg))return"https://www.supremecourt.gov/opinions/19pdf/18-9526_9okb.pdf";
+  if(/6\s+NYCRR\s+Part\s+617/i.test(reg))return"https://www.dec.ny.gov/permits/357.html";
+  if(/NY\s+ECL\s+Article\s+24/i.test(reg))return"https://www.dec.ny.gov/permits/1507.html";
+  return null;
+}
+function basis(p){
+  if(p.gap)return{l:"Verify",c:"#92400e",bg:"#fef3c7"};
+  const cited=/(\d+\s+CFR|IAC\s+\d+|TAC\s+\d+|NYCRR|O\.S\.|NFPA\s+\d+|IBC|IFC|IC\s+\d)/i.test(p.regulation||"");
+  if(cited&&p.confidence==="High")return{l:"Cited",c:"#15803d",bg:"#dcfce7"};
+  return{l:"Estimated",c:"#1e40af",bg:"#dbeafe"};
+}
+function mkResp(p){
+  if(p.matrix==="ops")return"ops";
+  if(OPS_IDS.has(p.id))return"compliance";
+  if(GC_IDS.has(p.id))return"gc";
+  return"owner";
+}
+function mk(id,name,type,mx,cat,sub,agency,reg,rw,nw,lb,cp,conf,notes,gap,preds,rt){
+  return{id,name,type:type||"Permit",matrix:mx,category:cat,subcategory:sub,agency,regulation:reg||"",rw:rw||0,nw:nw||0,lb:lb||0,critical_path:cp||false,confidence:conf||"Medium",notes:notes||"",gap:gap||false,predecessors:preds||[],red_tag:rt||false};
+}
+function buildPermits(f){
+  const ag=AG[f.state]||AG._;const c=f.county||"County";const st=f.state;
+  const floodAE=["Zone AE (100-yr)","Zone AO (Sheet Flow)","Zone VE (Coastal)","SFHA -- Other"].includes(f.floodZone);
+  const hasBrown=f.brownfield!=="No"&&f.brownfield!=="TBD";
+  const needsCUP=f.zoning==="Requires CUP",needsRezone=f.zoning==="Requires Rezoning"||f.zoning==="Agricultural";
+  const needs106=f.cultural==="Section 106 Triggered",needsCult=!needs106&&(f.cultural==="SHPO Consultation Required"||f.cultural==="Survey Required");
+  const hasBESS=f.bess==="BESS"||f.bess==="BESS + UPS",hasSub=f.power==="Dedicated Utility Substation";
+  const needsWaterExt=f.waterSewer==="Requires Extension"||f.waterSewer==="Requires New Infrastructure";
+  const isEmGen=f.genOn&&!f.btmOn&&f.genUsage===GE,isNonEm=f.genOn&&(f.btmOn||f.genUsage!==GE);
+  const isNonAtt=f.attainment.includes("Non-attainment"),isAtt=f.attainment.includes("Attainment zone");
+  const airCP=!isEmGen;
+  const bAHJmap={Indiana:{Sullivan:"No local building dept -- IDHS state review is default AHJ"},Texas:{Cameron:"City of Harlingen or NO permit required unincorporated TX (LGC 233)",Harris:"City of Houston or NO permit required unincorporated area"},Alabama:{Bibb:"State Fire Marshal (Ala. Code 36-19-1) -- no local building dept confirmed"}};
+  const bAHJ=(bAHJmap[st]||{})[c]||`${c} Building Dept.`;
+  const bGapMap={Indiana:{Sullivan:true},Texas:{Cameron:true,Harris:true},Alabama:{Bibb:true}};
+  const bGap=(bGapMap[st]||{})[c]||false;
+  const csgpR={Indiana:"327 IAC 15-5 (Rule 5) / CWA 402(p)",Texas:"TCEQ General Permit TXR150000 / 30 TAC 281","New York":"SPDES GP-0-20-001",Oklahoma:"ODEQ OPDES CGP / OAC 252:606",Alabama:"ADEM NPDES CGP / 335-6-12",Arkansas:"ADEQ CGP / APCEC Regulation 17"}[st]||"State CGP / CWA 402(p)";
+  const bldgC={Indiana:"675 IAC 13 (IBC 2021 base) + IDHS Design Release (675 IAC 12-6) required before construction",Texas:"Texas LGC 214.212; LGC Chapter 233 PROHIBITS counties from requiring permits in unincorporated areas; NEC 2020 statewide","New York":"Building Code of New York State 2025 (19 NYCRR, IBC 2024 base)",Oklahoma:"OAC Title 748, Chapter 20 (OUBCC IBC 2018 mandatory minimum); NEC 2023 eff. Sept 14 2024",Alabama:"NOTE: Alabama State Building Code applies ONLY to public buildings -- NOT private data centers. State Fire Marshal is default AHJ where no local official exists.",Arkansas:"Arkansas Fire Prevention Code Vol. II (IBC 2021 base, eff. Jan 1 2023)",Virginia:"13 VAC 5-63 (Virginia USBC, 2018 IBC base)"}[st]||"Local building code -- verify adopted edition and local amendments with AHJ";
+  const dotR={Indiana:"105 IAC 7-4 / IC 8-20-2",Texas:"43 TAC Chapter 11","New York":"Highway Law Section 52",Oklahoma:"OAC 730:35",Alabama:"Ala. Code 23-1-4",Virginia:"24 VAC 30-73"}[st]||"State highway access regulations";
+  const airR={Indiana:"326 IAC 2-5.1-3",Texas:"30 TAC 116.601-615",Oklahoma:"OAC 252:100-7",Alabama:"ADEM Admin. Code r. 335-3-14",Arkansas:"ADEQ Air permits"}[st]||"State minor NSR rules";
+  const spP=needsCUP?["l_cup"]:needsRezone?["l_rezone"]:[];
+  const airNote=isEmGen?(st==="Texas"?"PBR 106.511 self-implementing -- NO registration, NO fee. Max 876 hrs/yr. Records required (30 TAC 106.8).":"Emergency standby: state minor source only. Generators >100 HP typically require permit."):isNonEm?`Non-emergency/BTM: full emissions inventory required. ${isNonAtt?"Non-attainment: 100 TPY threshold. Plan 18-24 months.":isAtt?"Attainment: 250 TPY threshold.":"Confirm attainment zone."}`:  "Confirm emergency vs. non-emergency classification.";
+  const all=[
+    (f.wetlands||f.hasStream)&&mk("f_jd","USACE Jurisdictional Determination","Consultation","site","Federal","Environmental",ag.usace,"33 CFR Part 331",8,2,2,false,"High","Formal WOTUS determination. Approved JD valid 5 years. Required before Section 404 permit.",false,[],false),
+    (f.wetlands||f.hasStream)&&mk("f_404","CWA Section 404 Permit","Permit","site","Federal","Environmental",ag.usace,"CWA Section 404 / 33 CFR Part 323",12,2,4,true,"High","NWP if impacts <0.5 ac (PCN if >0.1 ac). Individual Permit if >0.5 ac. JD required first.",false,["f_jd"],true),
+    f.hasStream&&mk("f_sec10","Rivers and Harbors Act Section 10","Permit","site","Federal","Environmental",ag.usace,"33 CFR Part 322",12,2,4,false,"High","Required for work in, over, or under navigable waters.",false,[],true),
+    floodAE&&mk("f_clomr","CLOMR -- Conditional Letter of Map Revision","Approval","site","Federal","Floodplain","FEMA","44 CFR Part 65 / FEMA MT-2",52,2,8,true,"High","Required before grading in SFHA. Certified HEC-RAS study required. FEMA review 12-18 months. Initiate at project kickoff.",false,[],true),
+    floodAE&&mk("f_lomr","LOMR -- Letter of Map Revision","Approval","site","Federal","Floodplain","FEMA","44 CFR Part 65",18,2,0,false,"High","Filed post-construction to revise FIRM panel. Required before CO on flood-affected parcels.",false,["f_clomr"],false),
+    f.airport!=="None Within 5 mi"&&mk("f_faa","FAA Form 7460-1 -- Notice of Proposed Construction","Approval","site","Federal","Other","Federal Aviation Administration","14 CFR Part 77",4,0,4,false,"High","Required for structures affecting navigable airspace. Submit before design finalized.",false,[],true),
+    f.species&&mk("f_esa","ESA Section 7 Informal Consultation","Consultation","site","Federal","Environmental","USFWS","ESA Section 7 / 50 CFR Part 402",8,0,4,false,"Medium","Required if federal nexus and project may affect listed species. Formal consultation if likely adverse effect -- 135-day clock.",false,[],true),
+    mk("f_mbta","MBTA -- Nesting Bird Survey and Clearing Protocol","Consultation","site","Federal","Environmental","USFWS","MBTA / 16 U.S.C. 703",2,0,2,false,"Medium","Pre-clearing nesting survey within 3 days. Clear Sept 1 - Mar 31 to eliminate incidental take risk.",false,[],false),
+    needs106&&mk("f_106","NHPA Section 106 Consultation","Consultation","site","Federal","Cultural","ACHP / "+ag.shpo,"NHPA Section 106 / 36 CFR Part 800",12,0,4,false,"High","Required if federal nexus and project may affect historic properties.",false,[],false),
+    needsCult&&mk("f_shpo","SHPO Phase I/II Archaeological Survey","Consultation","site","Federal","Cultural",ag.shpo,"NHPA Section 106 / 36 CFR Part 800",8,0,4,false,"Medium","Phase I survey + shovel testing before grading.",false,[],false),
+    mk("s_csgp","Construction Stormwater General Permit (CSGP)","Permit","site","State","Water/NPDES",ag.npdes,csgpR,st==="Indiana"?0:1,0,1,false,"High",st==="Indiana"?"Indiana Rule 5 (327 IAC 15-5): NOI via IDEM ePortal -- construction authorized 48 HOURS after NOI submission. SWPPP required.":st==="Alabama"?"ADEM NPDES CGP. CBMPP required before NOI. Fee: $1,385. 30-day review.":"File NOI before disturbance >= 1 acre. SWPPP required.",false,[],true),
+    st==="Indiana"&&mk("in_inhdc","Indiana NHDC -- Nongame and Endangered Species Review","Consultation","site","State","Environmental","IDNR Natural Heritage Data Center","IC 14-22-34",2,0,4,false,"High","Species list required for IDEM 401/wetland permitting. Sullivan County: Indiana Bat (E, S1), multiple S1/S2 mussels, Bald Eagle confirmed per 2025 list.",false,[],false),
+    st==="Indiana"&&f.county==="Sullivan"&&mk("in_cemetery","IDNR DHPA Cemetery/Archaeological Review -- IC 14-21-1","Consultation","site","State","Cultural","IDNR Division of Historic Preservation and Archaeology (DHPA)","IC 14-21-1 / IC 23-14-57",4,0,2,false,"High","CRITICAL FOR PROJECT NOVA: Bennett Cemetery (CR-77-36) confirmed within footprint. Any grading within 100 ft of cemetery boundary requires Cemetery Development Plan and DHPA permit. Establish 100-ft avoidance setback before grading design is finalized.",true,[],false),
+    (f.wetlands||f.hasStream)&&st==="Indiana"&&mk("in_401","CWA 401 -- Indiana Water Quality Certification","Permit","site","State","Water/NPDES","IDEM","327 IAC 5-5-2 / CWA Section 401",12,2,4,false,"High","Pre-filing meeting with IDEM required 30 days before application; standard 90-day review.",false,["f_404"],false),
+    floodAE&&st==="Indiana"&&mk("in_flood","Indiana Flood Control Act -- Floodway Permit","Permit","site","State","Floodplain","IDNR Division of Water","IC 14-28-1",12,2,4,false,"High","Applies to FLOODWAYS only. State Form 42946. Fee $200 non-residential.",false,["f_clomr"],false),
+    (f.wetlands||f.hasStream)&&st==="New York"&&mk("ny_fww","NYSDEC Freshwater Wetlands Permit (Article 24)","Permit","site","State","Environmental","NYSDEC","NY ECL Article 24 / 6 NYCRR Part 663",8,2,4,false,"High","Required for activities in NYSDEC-regulated freshwater wetlands; includes 100-ft adjacent area.",false,["f_jd"],false),
+    (needsCUP||needsRezone)&&st==="New York"&&mk("ny_seqra","SEQRA -- State Environmental Quality Review","Approval","site","State","Environmental","NYSDEC / Local Lead Agency","NY ECL Article 8 / 6 NYCRR Part 617",26,0,8,true,"High","Required for all discretionary local approvals. Large data centers are Type I actions -- full EAF or EIS likely required. EIS adds 12-24 months.",false,[],true),
+    hasSub&&st==="New York"&&mk("ny_psc","NY PSC Article VII -- Electric Transmission Facility Siting","Permit","site","State","Utility","NY Public Service Commission","NY Public Service Law Article VII / 16 NYCRR Part 86",52,4,8,true,"High","Required for new electric transmission 100kV+ exceeding applicable mileage thresholds.",true,[],true),
+    st==="Oklahoma"&&mk("ok_tribal","Tribal Jurisdiction Verification (McGirt)","Consultation","site","State","Other","Oklahoma Governor Office / Tribal Nation","McGirt v. Oklahoma, 591 U.S. (2020)",4,0,2,false,"High","Eastern Oklahoma: verify whether site falls within tribal reservation boundaries before committing to permit strategy.",true,[],false),
+    hasBrown&&mk("s_bcp","Brownfield VCP/BCP Enrollment","Approval","site","State","Environmental",ag.brownfield,"State VCP/BCP program",26,0,8,true,"Medium","VCP enrollment required before redevelopment.",true,[],false),
+    mk("s_dot","State DOT Driveway / Access Permit","Permit","site","State","Traffic",ag.dot,dotR,8,1,4,false,"Medium","Required for access on state-maintained highway.",true,["l_tis"],false),
+    needsCUP&&mk("l_cup","Conditional Use Permit (CUP)","Permit","site","Local","Zoning/Land Use",`${c} Planning Dept.`,"Local zoning ordinance",20,0,4,true,"Medium","Public hearing required. Initiate at project kickoff.",true,[],false),
+    needsRezone&&mk("l_rezone","Rezoning Application","Approval","site","Local","Zoning/Land Use","City/County Council","Local zoning ordinance",32,0,4,true,"Medium","Legislative action. 6-18+ months. Initiate immediately.",true,[],false),
+    mk("l_siteplan","Site Plan Approval","Approval","site","Local","Zoning/Land Use",`${c} Planning Dept.`,"Local zoning ordinance",12,0,4,true,"Medium","Required before building permit and grading permit.",bGap,spP,false),
+    st==="Indiana"?mk("l_drainage","County Drainage Board Review","Approval","site","Local","Site/Civil","Sullivan County Drainage Board","IC 36-9-27 / IC 36-9-27.4",4,1,2,true,"High","Required before grading near regulated drains.",false,["l_siteplan"],false):mk("l_grading","Land Disturbance / Grading Permit","Permit","site","Local","Site/Civil",`${c} Public Works`,"Local grading ordinance",6,1,2,true,"Medium","Typically >50-100 CY cut/fill. ESCP approval required.",true,["l_siteplan"],true),
+    f.traffic&&mk("l_tis","Traffic Impact Study (TIS) Approval","Approval","site","Local","Traffic",`${c} Public Works`,"ITE TGM 11th ed.",8,0,2,false,"Medium","Required for large-scale development.",true,[],false),
+    f.traffic&&mk("l_driveway","Commercial Driveway / Access Permit","Permit","site","Local","Traffic",`${c} Highway Dept.`,"Local driveway access ordinance",4,1,2,false,"Medium","Required for all commercial access points.",bGap,["l_tis"],false),
+    f.waterMainReloc&&mk("l_water_reloc","Water Main Relocation / Betterment Agreement","Agreement","site","Local","Utility",`${c} Utility Authority`,"Local utility relocation ordinance / AWWA C600",12,4,4,true,"Medium","Developer typically funds full relocation cost. Engage utility immediately.",true,[],false),
+    (needsWaterExt||f.waterMainReloc)&&mk("l_water_ext","Water Main Extension / Developer Agreement","Agreement","site","Local","Utility",`${c} Utility Authority`,"Local utility extension ordinance / AWWA C600",16,4,4,true,"Medium","Developer funds design and construction. Verify fire flow (min 3,000 GPM).",true,["l_siteplan"],true),
+    mk("l_util_w","Water and Sewer Connection Permits","Permit","site","Local","Utility",`${c} Utility Authority`,"Local utility connection ordinance",6,2,2,false,"Medium","Verify fire flow capacity (min 3,000 GPM) at project kickoff.",true,["l_siteplan"],true),
+    floodAE&&mk("l_flood","Local Floodplain Development Permit","Permit","site","Local","Floodplain",`${c} Floodplain Administrator`,"Local floodplain ordinance / 44 CFR Part 60",4,1,2,false,"Medium","Required for all development in SFHA. Post-construction elevation certificate required.",false,["f_clomr"],true),
+    hasSub&&mk("l_sub","Utility Substation -- Interconnection Permit","Permit","substation","Local","Utility","Utility Authority / State PUC","State utility regulations / FERC / NERC FAC-001",20,4,8,true,"Medium",`Dedicated ${f.txV} substation. Begin utility engagement at project kickoff.`,true,[],true),
+    (f.gasExtension||f.btmOn)&&mk("l_gas_ext","Gas Utility Main Extension / Service Agreement","Agreement","site","Local","Utility","Local gas distribution company (LDC)","State PUC / LDC tariff",16,2,4,true,"Medium","Confirm gas capacity availability early.",f.gasExtension,[],true),
+    f.hasDewater&&mk("l_dewater","Dewatering Discharge Permit","Permit","site","State","Water/NPDES",ag.npdes,"CWA Section 402 / State NPDES program",4,1,2,false,"Medium","Required for dewatering discharge to surface water or municipal sewer.",false,[],true),
+    f.hasDemo&&mk("l_demo","Demolition Permit","Permit","site","Local","Site/Civil",bAHJ,"IBC Chapter 33",3,1,1,false,"Medium","Utility disconnect certificates required. Pre-1978: NESHAP asbestos survey required before permit.",false,[],true),
+    f.railroadCrossing&&mk("l_railroad","Railroad / Pipeline Crossing Agreement","Agreement","site","Local","Site/Civil","Railroad or pipeline operator","49 CFR Part 213 (FRA)",12,2,2,false,"Medium","Each operator has its own process.",false,[],false),
+    f.genOn&&mk("f_spcc","SPCC Plan","Compliance","building","Federal","Environmental","US EPA","40 CFR Part 112",0,0,0,false,"Medium",f.dieselGal&&parseInt(f.dieselGal)>1320?`${f.dieselGal} gal exceeds 1,320 gal threshold. PE-certified SPCC plan required before first fuel delivery.`:"Confirm total diesel storage. SPCC required if aggregate petroleum >1,320 gal.",parseInt(f.dieselGal||"0")<=1320&&!!f.dieselGal,[],false),
+    f.btmOn&&mk("f_titlev","Title V Major Source Air Operating Permit","Permit","building","Federal","Air Quality",`${ag.air} (EPA oversight)`,"40 CFR Part 70 / 40 CFR Part 63 Subpart ZZZZ",52,4,8,true,"High",`${f.btmMW} MW BTM ${f.btmFuel.toLowerCase()} generation almost certainly exceeds 100 TPY NOx. 30-day public comment + 45-day EPA review non-waivable. Longest-lead permit on project.`,false,[],true),
+    f.btmOn&&isAtt&&mk("f_psd","BTM -- PSD Permit","Permit","building","Federal","Air Quality","US EPA / "+ag.air,"40 CFR Part 52.21 / Clean Air Act Section 165",52,4,8,true,"High","Applies to new major sources in attainment areas emitting >= 250 TPY. BACT analysis required.",false,[],true),
+    f.btmOn&&isNonAtt&&mk("f_nsr","BTM -- Nonattainment NSR Permit","Permit","building","Federal","Air Quality","US EPA / "+ag.air,"40 CFR Part 51 Subpart I / Clean Air Act Section 173",52,4,8,true,"High","Applies in non-attainment areas. Requires LAER and emission offsets at ratio >= 1.2:1.",false,[],true),
+    f.genOn&&mk("f_nsps","NSPS Subpart IIII -- CI Engine Compliance","Compliance","building","Federal","Air Quality",ag.air,"40 CFR Part 60 Subpart IIII / 40 CFR Part 63 Subpart ZZZZ",0,2,0,false,"High",`${f.genCount}x ${f.genKW||"[kW]"} ${f.genFuel} generator(s). Not a permit -- federal compliance obligation. Tier 4 for engines 500+ hp. Initial notification within 30 days of startup.`,false,[],true),
+    st==="Texas"&&f.genOn&&isEmGen&&mk("tx_pbr","TCEQ PBR 106.511 -- Emergency Generator Recordkeeping","Compliance","building","State","Air Quality","Facility Records","30 TAC Sections 106.511 / 106.4 / 106.8",0,0,0,false,"High","SELF-IMPLEMENTING -- NO registration, NO fee. Max 876 hrs/yr for 24/7 facility.",false,[],false),
+    st==="Texas"&&f.genOn&&!isEmGen&&mk("tx_egu","TCEQ Standard Permit for EGUs","Permit","building","State","Air Quality","TCEQ Air Permits","30 TAC Sections 116.601-615",12,1,4,airCP,"Medium","Required for non-emergency/BTM generators. STEERS account must be active before submission.",false,[],true),
+    f.genOn&&st!=="Texas"&&mk("s_air_c","Air Quality Construction Permit -- Minor NSR","Permit","building","State","Air Quality",ag.air,airR,24,1,4,airCP,"Medium",`${f.genCount}x ${f.genKW||"[kW]"} ${f.genFuel} generator(s). ${airNote}`,st!=="Indiana"&&st!=="Oklahoma"&&st!=="Alabama",[],true),
+    f.genOn&&isNonEm&&st!=="Texas"&&mk("s_fesop","Federally Enforceable State Operating Permit (FESOP)","Permit","building","State","Air Quality",ag.air,"State FESOP program",8,1,2,false,"Medium","Caps actual emissions below Title V major source thresholds. File within 6 months of startup.",false,["s_air_c"],false),
+    f.genOn&&mk("s_ast","Aboveground Storage Tank (AST) Registration","Permit","building","State","Environmental","State Environmental Agency","State AST regulations",3,1,1,false,"High",`${f.dieselGal?f.dieselGal+" gal declared. ":""}Register diesel tanks before installation. Secondary containment design required.`,false,[],false),
+    f.hasUST&&mk("f_ust","Underground Storage Tank (UST) Registration","Permit","building","Federal","Environmental","US EPA / State UST Program","40 CFR Part 280 / State UST program",3,1,1,false,"High","Required for underground tanks >= 110 gallons. Register before installation.",false,[],true),
+    f.hasLargeCoolant&&mk("f_608","EPA Section 608 Refrigerant Compliance","Compliance","building","Federal","Refrigerant","US EPA","Clean Air Act Section 608 / 40 CFR Part 82 Subpart F",0,0,0,false,"Medium","Technicians servicing >= 50 lbs refrigerant must be EPA 608 certified.",false,[],false),
+    f.hasPCBRisk&&mk("f_pcb","PCB Transformer Oil Compliance","Compliance","building","Federal","Environmental","US EPA","TSCA Section 6(e) / 40 CFR Part 761",2,0,2,false,"Medium","Applies to transformers with >= 50 ppm PCBs. >= 500 ppm requires specific disposal approval.",false,[],false),
+    mk("f_rcra","RCRA Hazardous Waste Generator ID","Compliance","building","Federal","Waste Management","US EPA / State Hazardous Waste Program","RCRA 40 CFR Parts 262.14/262.16/262.17",0,0,2,false,"Medium","Obtain EPA Generator ID before facility generates any hazardous waste.",false,[],false),
+    mk("l_building","Building Permit","Permit","building","Local","Building",bAHJ,bldgC,8,2,2,true,bGap?"Gap":"Medium","Verify adopted code edition and enforcement jurisdiction with AHJ.",bGap,["l_siteplan"],true),
+    mk("l_mep","MEP Permits -- Mechanical, Electrical, Plumbing","Permit","building","Local","Building",bAHJ,"IBC / NFPA 70 (NEC) / IMC / IPC",3,1,1,false,"Medium","Sub-permits for mechanical (cooling, HVAC), electrical (service, UPS, generator tie-in), and plumbing.",bGap,["l_building"],false),
+    mk("l_temp_elec","Temporary Electrical Power Permit","Permit","building","Local","Building",bAHJ,"NEC (NFPA 70) Article 590",2,1,1,false,"Medium","All temporary electrical installations during construction require permit.",bGap,[],true),
+    mk("l_hv_work","High-Voltage Work Permit (>600V)","Permit","building","Local","Building",bAHJ,"NEC (NFPA 70) / OSHA 29 CFR 1910.269",2,1,1,false,"Medium","Applies to switchgear, transformers, medium-voltage distribution.",bGap,["l_building"],true),
+    mk("l_fire_s","Fire Suppression System Permit","Permit","building","Local","Fire/Life Safety",`${c} Fire Dept. (AHJ)`,"IBC Section 904 / IFC Chapter 9 / NFPA 13",4,2,1,false,"Medium","Double-interlock pre-action per NFPA 13. Water flow test within 12 months of application (NFPA 13 Section 4.5.1.1).",true,["l_building"],true),
+    mk("l_fire_a","Fire Alarm and Detection System Permit","Permit","building","Local","Fire/Life Safety",`${c} Fire Dept. (AHJ)`,"IBC Section 907 / IFC Chapter 9 / NFPA 72",3,2,1,false,"Medium","Addressable NFPA 72 system. Battery backup calculations required (NFPA 72 Section 10.6.7).",true,["l_building"],true),
+    mk("l_spec","Special Inspection and Structural Observation Program","Approval","building","Local","Building",bAHJ,"IBC Chapter 17 / AISC 360-22 / ACI 318-19",2,1,1,false,"Medium","Structural steel, concrete, soils, PEMB connections. AHJ-approved inspector required before construction.",true,["l_building"],false),
+    f.genOn&&mk("l_gen","Generator Installation Permit","Permit","building","Local","Building",bAHJ,"IBC / NFPA 110 / NEC Article 445 / NEC Article 700",3,1,1,false,"Medium",`${f.genCount}x ${f.genKW||"[kW]"} generator(s). NFPA 110 Level 1 compliance required.`,true,["l_building"],true),
+    f.genOn&&mk("l_fuel","Fuel Storage Permit -- Aboveground Combustible Liquid","Permit","building","Local","Fire/Life Safety",`${c} Fire Marshal`,"IFC Section 5704 / NFPA 30",3,1,1,false,"Medium","Diesel is Class II combustible liquid. Secondary containment at 110% of largest tank. UL 142 or UL 2085 tanks required.",true,["l_gen"],true),
+    hasBESS&&mk("l_hazmat","Hazardous Materials Permit -- BESS","Permit","building","Local","Fire/Life Safety",`${c} Fire Dept. (AHJ)`,"IFC Section 1207 / NFPA 855 / UL 9540 / UL 9540A",6,2,2,false,"Medium","UL 9540 listing required. >600 kWh: UL 9540A fire modeling required. 2-hour fire-rated separation. Pre-application AHJ meeting strongly recommended.",false,["l_building"],true),
+    (f.genOn||hasBESS)&&mk("s_epcra","EPCRA Section 312 -- Tier II Report","Compliance","building","Federal","Environmental","State SERC / LEPC","42 U.S.C. Section 11022 (EPCRA Section 312) / 40 CFR Part 370",0,0,2,false,"High","Annual filing if hazardous chemicals above threshold quantities. Key triggers: diesel (~1,400 gal), sulfuric acid (UPS batteries), refrigerants.",false,[],false),
+    f.hasCoolingTower&&f.processDischarge==="Sanitary Sewer (POTW)"&&mk("l_pretreat","POTW Industrial Pretreatment Permit","Permit","building","Local","Water/NPDES",`${c} POTW`,"40 CFR Part 403 (General Pretreatment Regulations)",4,8,4,false,"Medium","Required if facility qualifies as SIU -- triggered at >25,000 GPD process wastewater to POTW.",true,[],true),
+    mk("l_co","Certificate of Occupancy (CO)","Approval","building","Local","Building",bAHJ,"IBC Section 111",1,0,0,false,"High","Required before equipment energization or occupancy. Issued after final inspection.",bGap,["l_mep","l_fire_s","l_fire_a"],true),
+    (f.genOn||f.hasOutdoorIndustrial)&&mk("ops_msgp","NPDES MSGP -- Industrial Stormwater","Permit","ops","Federal","Water/NPDES","US EPA / "+ag.npdes,"40 CFR Part 122 / EPA MSGP 2021",1,0,0,false,"High","Required if stormwater exposure to industrial activity: outdoor fueling, transformer yards, outdoor generators.",false,[],true),
+    mk("ops_fire","Fire Suppression System -- Annual Inspection","Compliance","ops","Local","Fire/Life Safety",`${c} Fire Dept. / Licensed Contractor`,"NFPA 25 / NFPA 2001 / IFC 2021 Section 901.6",0,0,0,false,"High","Annual inspection and testing by licensed contractor required.",false,[],true),
+    hasBESS&&mk("ops_bess","BESS -- Annual AHJ Inspection","Compliance","ops","Local","Fire/Life Safety",`${c} Fire Dept. (AHJ)`,"IFC 2021 Section 1206 / NFPA 855 / UL 9540A",0,0,0,false,"High","Annual inspection. Re-permitting required if capacity or chemistry changes.",false,[],true),
+    f.genOn&&mk("ops_spcc","SPCC Plan -- Amendment and 5-Year Re-Certification","Compliance","ops","Federal","Environmental","US EPA","40 CFR Part 112.5",0,0,0,false,"Medium","Amendment within 6 months of any facility change. Full PE re-certification every 5 years.",false,[],false),
+  ].filter(Boolean);
+  const sids=new Set();
+  const sc=all.filter(p=>{
+    if(p.matrix==="site"&&!f.scopeSite)return false;
+    if(p.matrix==="building"&&!f.scopeBuilding)return false;
+    if(p.matrix==="substation"&&!f.scopeSubstation)return false;
+    if(p.matrix==="ops"&&!f.scopeOps)return false;
+    sids.add(p.id);return true;
+  });
+  return sc.map(p=>({...p,predecessors:p.predecessors.filter(id=>sids.has(id)),resp:mkResp(p)}));
+}
+function getCS(p,scs,bcs){if(p.matrix==="ops")return null;return p.matrix==="site"?(scs?new Date(scs+"T12:00:00"):null):(bcs?new Date(bcs+"T12:00:00"):null);}
+function getSub(p,scs,bcs){const cs=getCS(p,scs,bcs);return cs?addDays(cs,-(p.rw+p.nw+p.lb)*7):null;}
+function getIss(p,scs,bcs){const cs=getCS(p,scs,bcs);return cs?addDays(cs,-(p.nw+p.lb)*7):null;}
+// Dependency-aware schedule: topological sort + forward pass
+// Ideal dates work backward from CS. Predecessor constraints push submit dates later.
+function computeSchedule(permits,scs,bcs){
+  const pMap=Object.fromEntries(permits.map(p=>[p.id,p]));
+  const inDeg=Object.fromEntries(permits.map(p=>[p.id,0]));
+  permits.forEach(p=>p.predecessors.forEach(dep=>{if(pMap[dep])inDeg[p.id]=(inDeg[p.id]||0)+1;}));
+  const queue=permits.filter(p=>!inDeg[p.id]).map(p=>p.id);
+  const order=[];const visited=new Set(queue);
+  while(queue.length){
+    const id=queue.shift();order.push(id);
+    permits.forEach(p=>{if(p.predecessors.includes(id)&&!visited.has(p.id)){inDeg[p.id]--;if(inDeg[p.id]<=0){visited.add(p.id);queue.push(p.id);}}});
+  }
+  permits.forEach(p=>{if(!visited.has(p.id))order.push(p.id);});
+  const result={};
+  for(const id of order){
+    const p=pMap[id];if(!p)continue;
+    const cs=getCS(p,scs,bcs);
+    const idealSubmit=cs?addDays(cs,-(p.rw+p.nw+p.lb)*7):null;
+    // Predecessor constraint: cannot submit until all predecessors are issued
+    let predConstraint=null;
+    for(const depId of p.predecessors){
+      const dep=result[depId];
+      if(dep&&dep.issued){if(!predConstraint||dep.issued>predConstraint)predConstraint=dep.issued;}
+    }
+    let actualSubmit=idealSubmit;let constrained=false;
+    if(predConstraint&&(!actualSubmit||predConstraint>actualSubmit)){actualSubmit=predConstraint;constrained=true;}
+    // Issued = submit + review weeks (forward pass; NOT backward from CS)
+    const actualIssued=actualSubmit?addDays(actualSubmit,p.rw*7):null;
+    // NTP end = issued + ntp weeks
+    const ntpEnd=actualIssued?addDays(actualIssued,p.nw*7):null;
+    result[id]={submit:actualSubmit,issued:actualIssued,ntpEnd,cs,constrained};
+  }
+  return result;
+}
+function urgency(p,scs,bcs){const sd=getSub(p,scs,bcs);if(!sd)return"med";const d=(sd-new Date())/86400000;return d<0?"past":d<30?"crit":d<90?"high":"med";}
+const UC={past:{bg:"#1e293b",c:"white",l:"Overdue"},crit:{bg:"#fef2f2",c:"#dc2626",l:"Urgent"},high:{bg:"#fef9c3",c:"#92400e",l:"Start Soon"},med:{bg:"#f0fdf4",c:"#15803d",l:"Upcoming"}};
+const catBg={Federal:"#fef2f2",State:"#eff6ff",Local:"#f0fdf4"};
+const catC={Federal:"#991b1b",State:"#1e40af",Local:"#15803d"};
+const catBar={Federal:"#dc2626",State:"#2563eb",Local:"#16a34a"};
+const RS={owner:{bg:"#eff6ff",c:"#1d4ed8",l:"Owner"},gc:{bg:"#faf5ff",c:"#7c3aed",l:"GC"},compliance:{bg:"#f0f9ff",c:"#0369a1",l:"Compl."},ops:{bg:"#fff7ed",c:"#92400e",l:"Ops"}};
+const inp={width:"100%",boxSizing:"border-box",padding:"4px 6px",border:"1px solid #e2e8f0",borderRadius:4,fontSize:11,background:"#f8fafc",color:"#0f172a"};
+function Chip({l,bg,c,title}){return<span title={title} style={{display:"inline-block",padding:"1px 5px",borderRadius:3,background:bg,color:c,fontSize:9,fontWeight:700,lineHeight:"16px"}}>{l}</span>;}
+function SH({label}){return<div style={{fontWeight:700,fontSize:10,color:"#64748b",marginTop:9,marginBottom:3,textTransform:"uppercase",letterSpacing:"0.05em",borderTop:"1px solid #f1f5f9",paddingTop:6}}>{label}</div>;}
+function SF({label,k,form,upd,opts}){return<label style={{display:"block",marginBottom:3}}><span style={{color:"#475569",display:"block",marginBottom:1,fontSize:11}}>{label}</span><select value={form[k]} onChange={e=>upd(k,e.target.value)} style={inp}>{opts.map(o=><option key={o} value={o}>{o}</option>)}</select></label>;}
+function CF({label,k,form,upd}){return<label style={{display:"flex",alignItems:"center",gap:3,cursor:"pointer",marginBottom:2,fontSize:11,color:"#475569"}}><input type="checkbox" checked={!!form[k]} onChange={e=>upd(k,e.target.checked)} style={{margin:0}}/>{label}</label>;}
+function RegLink({p}){
+  const link=getLink(p.regulation);
+  if(!link&&!p.regulation)return null;
+  const label=p.regulation&&p.regulation.length>40?p.regulation.slice(0,38)+"…":p.regulation;
+  if(link)return<a href={link} target="_blank" rel="noreferrer" style={{display:"inline-block",padding:"1px 5px",borderRadius:3,background:"#eff6ff",color:"#2563eb",fontSize:9,fontWeight:700,textDecoration:"none",border:"1px solid #bfdbfe"}}>{label} ↗</a>;
+  return<Chip l={label} bg="#f8fafc" c="#64748b"/>;
+}
+function PermitCard({p,expanded,onToggle,scs,bcs}){
+  const b=basis(p);const rs=RS[p.resp]||RS.owner;
+  const bar=p.resp==="gc"?"#7c3aed":p.red_tag?"#dc2626":p.critical_path?"#f87171":(catBar[p.category]||"#64748b");
+  const sub=getSub(p,scs,bcs);const iss=getIss(p,scs,bcs);
+  return<div style={{background:"white",border:`1px solid ${p.gap?"#fde68a":p.red_tag?"#fca5a5":"#e2e8f0"}`,borderLeft:`3px solid ${bar}`,borderRadius:6,marginBottom:4,overflow:"hidden"}}>
+    {p.resp==="gc"&&<div style={{background:"#faf5ff",borderBottom:"1px solid #e9d5ff",padding:"2px 9px",fontSize:9,color:"#7c3aed",fontWeight:700}}>GC SCOPE -- shown for visibility only; GC procures</div>}
+    {p.resp==="compliance"&&<div style={{background:"#f0f9ff",borderBottom:"1px solid #bae6fd",padding:"2px 9px",fontSize:9,color:"#0369a1",fontWeight:700}}>COMPLIANCE OBLIGATION -- no agency application required; maintain records</div>}
+    {p.resp==="ops"&&<div style={{background:"#fff7ed",borderBottom:"1px solid #fed7aa",padding:"2px 9px",fontSize:9,color:"#92400e",fontWeight:700}}>ONGOING / OPERATIONAL -- establish before operations commence</div>}
+    <div onClick={onToggle} style={{padding:"8px 10px",cursor:"pointer",display:"flex",alignItems:"flex-start",gap:7}}>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap",marginBottom:2}}>
+          {p.critical_path&&<Chip l="CP" bg="#dc2626" c="white"/>}
+          {p.red_tag&&<Chip l="SWO" bg="#ea580c" c="white"/>}
+          {p.gap&&<Chip l="Gap" bg="#f59e0b" c="white"/>}
+          <span style={{fontWeight:600,fontSize:12,color:"#0f172a"}}>{p.name}</span>
+        </div>
+        <div style={{display:"flex",gap:3,flexWrap:"wrap"}}>
+          <Chip l={p.category} bg={catBg[p.category]||"#f1f5f9"} c={catC[p.category]||"#475569"}/>
+          <Chip l={p.subcategory} bg="#f1f5f9" c="#475569"/>
+          <Chip l={p.type} bg="#f8fafc" c="#64748b"/>
+          <Chip l={rs.l} bg={rs.bg} c={rs.c}/>
+          <Chip l={`Phase: ${p.matrix}`} bg="#f1f5f9" c="#64748b"/>
+          {p.rw>0&&<Chip l={`${p.rw}wk`} bg="#f8fafc" c="#94a3b8"/>}
+          <Chip l={b.l} bg={b.bg} c={b.c}/>
+          <RegLink p={p}/>
+        </div>
+      </div>
+      <div style={{textAlign:"right",flexShrink:0,marginLeft:6}}>
+        {sub&&<div style={{fontSize:10,fontWeight:700,color:"#dc2626"}}>{fmtD(sub)}</div>}
+        {sub&&<div style={{fontSize:9,color:"#94a3b8"}}>submit by</div>}
+        <span style={{color:"#94a3b8",fontSize:11}}>{expanded?"▲":"▼"}</span>
+      </div>
+    </div>
+    {expanded&&<div style={{padding:"0 10px 10px",borderTop:"1px solid #f1f5f9"}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8,marginTop:8}}>
+        <div><div style={{fontSize:9,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Agency</div><div style={{fontSize:11,color:"#334155"}}>{p.agency}</div></div>
+        <div><div style={{fontSize:9,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Regulation</div><RegLink p={p}/></div>
+        <div><div style={{fontSize:9,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Timeline</div><div style={{fontSize:11,color:"#334155"}}>{p.rw}wk review / {p.nw}wk NTP / {p.lb}wk buf</div></div>
+        {sub&&<div><div style={{fontSize:9,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Submit By</div><div style={{fontSize:11,fontWeight:700,color:"#dc2626"}}>{fmtD(sub)}</div></div>}
+        {iss&&<div><div style={{fontSize:9,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Issued ~</div><div style={{fontSize:11,color:"#475569"}}>{fmtD(iss)}</div></div>}
+        {p.predecessors.length>0&&<div><div style={{fontSize:9,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Predecessors</div><div style={{fontSize:11,color:"#334155"}}>{p.predecessors.join(", ")}</div></div>}
+      </div>
+      {p.notes&&<div style={{fontSize:11,color:"#334155",lineHeight:1.6,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:4,padding:"5px 8px",marginBottom:5}}>{p.notes}</div>}
+      {p.gap&&<div style={{background:"#fef3c7",border:"1px solid #fde68a",borderRadius:4,padding:"5px 8px",fontSize:11,color:"#92400e",fontWeight:600}}>GAP: AHJ or regulatory authority unconfirmed. Verify before scheduling.</div>}
+    </div>}
+  </div>;
+}
+function gapDetail(p){
+  const base={
+    summary:"AHJ or regulatory authority is unconfirmed for this permit. The permit has been included in the matrix based on project conditions, but the responsible agency, application process, and review timeline have not been verified for this jurisdiction.",
+    nextSteps:["Identify the correct AHJ -- confirm whether this falls under state, county, or municipal jurisdiction.","Call or email the AHJ to confirm applicability for a hyperscale data center at this scale.","Request the current application form, fee schedule, and review timeline.","Schedule a pre-application meeting if available.","Update the permit matrix with confirmed agency name, contact, and lead time before finalizing the schedule."]
+  };
+  const overrides={
+    l_siteplan:{summary:"Site plan approval is required but the planning/zoning authority has not been confirmed. In some jurisdictions this may fall under the county planning commission, a municipal planning department, or may not be required at all for unincorporated industrial sites.",nextSteps:["Confirm whether the site is in an incorporated or unincorporated area.","Contact the county or municipal planning department to verify site plan requirements.","Confirm if a pre-application conference is available or required.","Obtain the submittal checklist and confirm required drawings (grading, utility, stormwater, landscaping, access).","Verify public notice or hearing requirements."]},
+    l_building:{summary:"The applicable Building Official / AHJ has not been confirmed for this jurisdiction. Some states (Texas unincorporated, Alabama private facilities) do not require local building permits; others route through the state fire marshal or a state design release process.",nextSteps:["Confirm whether the site is in an unincorporated area -- in Texas, LGC Chapter 233 prohibits county building permits.","For Alabama: confirm State Fire Marshal is AHJ for private data centers.","For Indiana: confirm IDHS Design Release is required before construction.","Contact the identified AHJ to request current adopted code edition and application process.","Confirm special inspection program requirements (IBC Chapter 17) with the AHJ."]},
+    l_driveway:{summary:"Commercial driveway / access permit authority has not been confirmed. Depending on road classification, this may be issued by the county highway department, state DOT, or a municipality.",nextSteps:["Determine road classification (state highway, county road, municipal street) for all proposed access points.","Contact the applicable authority (state DOT vs. county highway dept) to confirm permitting jurisdiction.","Request current application form and typical review timeline.","Confirm whether a Traffic Impact Study (TIS) is required before driveway permit application.","Obtain encroachment permit requirements if work is in the right-of-way."]},
+    l_util_w:{summary:"Water and sewer connection authority has not been confirmed. This may be a county utility authority, a municipal utility district, a rural water district, or a private provider.",nextSteps:["Identify the water and sewer service provider for this parcel (confirm with county or state utility map).","Contact the provider to confirm connection availability and capacity.","Request the connection application, capacity fee schedule, and construction standards.","Verify fire flow availability (minimum 3,000 GPM for data center occupancy).","Confirm whether a water main extension or developer agreement will be required."]},
+    l_water_ext:{summary:"Water main extension is required but the utility authority has not been confirmed. Developer-funded extensions require a formal agreement and often involve a long design and approval process before construction can begin.",nextSteps:["Identify and contact the applicable water utility authority.","Request a capacity and availability letter confirming service can be extended to the site.","Engage a licensed civil engineer to prepare a hydraulic model confirming fire flow.","Request the utility's standard developer extension agreement and design standards.","Confirm easement requirements for the extension route."]},
+    s_dot:{summary:"State DOT driveway / access permit is required for access on a state-maintained highway but the specific DOT district office and process has not been verified.",nextSteps:["Confirm the road is state-maintained by checking the state DOT highway map.","Identify the responsible DOT district office for this county.","Contact the district access management engineer to request the permit application.","Confirm whether a Traffic Impact Study (TIS) is required as a prerequisite.","Obtain typical review timeline and bonding / insurance requirements."]},
+    s_bcp:{summary:"Brownfield VCP/BCP enrollment is flagged as required based on site conditions but the specific program, enrollment status, and applicable regulatory authority have not been confirmed.",nextSteps:["Confirm enrollment status with the state brownfield program -- verify if a Phase II ESA has been completed.","Contact the state brownfield program to request a pre-enrollment meeting.","Engage a licensed environmental consultant to review existing Phase I/II ESAs and identify data gaps.","Confirm whether a Remedial Action Plan (RAP) is required before site grading.","Confirm liability protections available under the state VCP (Certificate of Completion)."]},
+    in_cemetery:{summary:"Bennett Cemetery (CR-77-36) has been confirmed within the Project Nova footprint. IC 14-21-1 requires a Cemetery Development Plan and IDNR DHPA permit before ANY grading within 100 feet of the cemetery boundary. This is a hard legal constraint -- grading cannot proceed in the affected area without this permit.",nextSteps:["Immediately establish a 100-foot avoidance setback around the confirmed cemetery boundary in all grading design drawings.","Contact IDNR DHPA to request a pre-application consultation and confirm the Cemetery Development Plan content requirements.","Engage a licensed archaeologist or cultural resources consultant to document the cemetery.","Obtain the DHPA permit application form (IC 14-21-1 process) and submit as early as possible.","Coordinate with the project civil engineer to route all grading and stormwater improvements outside the 100-ft buffer.","Confirm whether IC 23-14-57 (Indiana Cemetery Relocation Act) applies if any graves fall within the construction footprint."]},
+    ok_tribal:{summary:"McGirt v. Oklahoma (2020) established that much of eastern Oklahoma remains within tribal reservation boundaries for purposes of federal criminal jurisdiction, and subsequent decisions have extended this to other areas. The permit and regulatory implications for data center development on these lands are not fully settled and must be verified site-specifically.",nextSteps:["Obtain a legal opinion from counsel familiar with Oklahoma tribal jurisdiction on whether this specific parcel falls within reservation boundaries.","Contact the applicable tribal nation's land management or planning office to understand their permitting requirements.","Engage the Oklahoma Governor's office tribal coordination staff for guidance.","Confirm whether state environmental, building, and land use permits remain applicable or are superseded.","Evaluate whether a Memorandum of Agreement (MOA) with the tribal nation is advisable or required before committing to the site."]},
+  };
+  return overrides[p.id]||base;
+}
+function GapCard({p}){
+  const[open,setOpen]=useState(false);
+  const b=basis(p);const d=gapDetail(p);
+  return<div style={{background:"#fefce8",border:"1px solid #fde68a",borderRadius:6,marginBottom:4,overflow:"hidden"}}>
+    <div onClick={()=>setOpen(x=>!x)} style={{display:"flex",gap:7,alignItems:"center",padding:"6px 10px",cursor:"pointer"}}>
+      <div style={{flex:1,fontWeight:600,color:"#78350f",fontSize:11}}>{p.name}</div>
+      <div style={{color:"#92400e",fontSize:10,flexShrink:0}}>{p.agency}</div>
+      <Chip l={b.l} bg={b.bg} c={b.c}/>
+      <span style={{color:"#92400e",fontSize:11,flexShrink:0}}>{open?"▲":"▼"}</span>
+    </div>
+    {open&&<div style={{borderTop:"1px solid #fde68a",padding:"8px 10px",background:"#fffbeb"}}>
+      <div style={{fontSize:11,color:"#78350f",lineHeight:1.6,marginBottom:8}}>{d.summary}</div>
+      <div style={{fontWeight:700,fontSize:10,color:"#92400e",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:5}}>Next Steps</div>
+      <ol style={{paddingLeft:16,margin:0}}>
+        {d.nextSteps.map((s,i)=><li key={i} style={{fontSize:11,color:"#334155",lineHeight:1.6,marginBottom:3}}>{s}</li>)}
+      </ol>
+    </div>}
+  </div>;
+}
+function ExecSummary({permits,form,stateNote}){
+  const[showSN,setShowSN]=useState(false);
+  const today=new Date();
+  const cp=permits.filter(p=>p.critical_path),gaps=permits.filter(p=>p.gap),rt=permits.filter(p=>p.red_tag);
+  const ownerP=permits.filter(p=>p.resp==="owner"),gcP=permits.filter(p=>p.resp==="gc"),opsP=permits.filter(p=>p.resp==="ops"),compP=permits.filter(p=>p.resp==="compliance");
+  const hasDates=form.site_cs||form.building_cs;
+  const cpS=[...cp].sort((a,b)=>{const sa=getSub(a,form.site_cs,form.building_cs),sb=getSub(b,form.site_cs,form.building_cs);if(!sa)return 1;if(!sb)return-1;return sa-sb;});
+  const lCP=cp.reduce((m,p)=>p.rw>m.rw?p:m,{rw:0,name:""});
+  const floodAE=["Zone AE (100-yr)","Zone AO (Sheet Flow)","Zone VE (Coastal)","SFHA -- Other"].includes(form.floodZone);
+  const isNonAtt=form.attainment.includes("Non-attainment");
+  const urg=p=>{const sd=getSub(p,form.site_cs,form.building_cs);if(!sd)return"med";const d=(sd-today)/86400000;return d<0?"past":d<30?"crit":d<90?"high":"med";};
+  let para=`This matrix covers ${permits.length} regulatory actions for ${form.name||"the proposed data center"} in ${form.county||"[County]"} County, ${form.state}. Of these, ${ownerP.length} are owner-procured, ${gcP.length} are GC-scope permits shown for visibility, ${compP.length} are compliance obligations, and ${opsP.length} are operational requirements. `;
+  if(cp.length>0){const names=cpS.slice(0,3).map(p=>p.name);para+=`The critical path runs through ${cp.length} permit${cp.length>1?"s":""}: ${names.join(", ")}${cp.length>3?`, and ${cp.length-3} others`:""}. `;if(lCP.rw>=26)para+=`The longest-lead item is ${lCP.name} at ~${lCP.rw} weeks review${lCP.rw>=52?" -- over a year; must be initiated at project kickoff":" -- submit well before construction start"}. `;}
+  if(floodAE)para+=`The site is in a Special Flood Hazard Area (${form.floodZone}); CLOMR required before grading. FEMA review 12-18 months -- treat as a day-one action. `;
+  if(isNonAtt)para+=`The county is non-attainment; NSR threshold is 100 TPY and offsets required at min 1.2:1. `;else if(form.attainment.includes("Attainment zone"))para+=`County is in attainment; PSD threshold is 250 TPY. `;
+  if(form.btmOn)para+=`BTM generation at ${form.btmMW} MW almost certainly triggers Title V -- allow 18-24 months for air permitting. `;
+  if(form.state==="Indiana"&&form.county==="Sullivan")para+=`CRITICAL: Bennett Cemetery (CR-77-36) confirmed within Project Nova footprint -- Cemetery Development Plan and DHPA permit required before any grading within 100 ft. `;
+  if(gaps.length>0)para+=`${gaps.length} item${gaps.length>1?"s":""} carry a GAP designation -- do not schedule until AHJ is confirmed. `;
+  if(rt.length>0)para+=`${rt.length} permit${rt.length>1?"s":""} carry stop-work risk.`;
+  const kpis=[{l:"Owner",v:ownerP.length,c:"#1d4ed8",bg:"#eff6ff"},{l:"GC Scope",v:gcP.length,c:"#7c3aed",bg:"#faf5ff"},{l:"Compliance",v:compP.length,c:"#0369a1",bg:"#f0f9ff"},{l:"Operational",v:opsP.length,c:"#92400e",bg:"#fff7ed"},{l:"Critical Path",v:cp.length,c:"#dc2626",bg:"#fef2f2"},{l:"Red Tag",v:rt.length,c:"#ea580c",bg:"#fff7ed"},{l:"Gaps",v:gaps.length,c:"#b45309",bg:"#fef9c3"}];
+  const recs=[cp.some(p=>p.rw>=52)&&"One or more CP permits have 12+ month review windows. Confirm already in progress before committing to construction start.",form.genOn&&form.attainment.includes("TBD")&&"Air quality attainment zone TBD. Drives NSR threshold. Engage air quality consultant immediately.",gaps.length>0&&`${gaps.length} gap item(s) with unconfirmed AHJ. Resolve before finalizing schedule.`,rt.length>0&&`${rt.length} red tag item(s) -- stop-work risk.`,form.state==="Indiana"&&form.county==="Sullivan"&&"CRITICAL: Bennett Cemetery within footprint. Establish 100-ft setback before grading design.",form.btmOn&&"BTM generation likely exceeds 100 TPY NOx major source threshold. Allow 18-24 months for air permitting.",floodAE&&"SFHA site. CLOMR required before grading. FEMA review 12-18 months -- initiate at project kickoff."].filter(Boolean);
+  return<div style={{display:"flex",flexDirection:"column",gap:10}}>
+    <div style={{display:"flex",gap:5}}>
+      {kpis.map(({l,v,c,bg})=><div key={l} style={{flex:1,background:bg,borderRadius:6,padding:"8px 6px",border:`1px solid ${c}22`,textAlign:"center",minWidth:0}}>
+        <div style={{fontSize:20,fontWeight:800,color:c,lineHeight:1}}>{v}</div>
+        <div style={{fontSize:9,color:c,marginTop:2,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l}</div>
+      </div>)}
+    </div>
+    <div style={{background:"white",border:"1px solid #e2e8f0",borderRadius:8,padding:14}}>
+      <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:7}}>Executive Summary</div>
+      <p style={{fontSize:12,color:"#334155",lineHeight:1.8,margin:0}}>{para}</p>
+    </div>
+    {recs.length>0&&<div style={{background:"white",border:"1px solid #fde68a",borderRadius:8,padding:12}}>
+      <div style={{fontWeight:700,fontSize:11,color:"#92400e",marginBottom:6}}>Action Items</div>
+      {recs.map((r,i)=><div key={i} style={{display:"flex",gap:6,alignItems:"flex-start",fontSize:11,color:"#334155",background:"#fef9c3",border:"1px solid #fde68a",borderRadius:4,padding:"4px 8px",marginBottom:3}}>
+        <span style={{color:"#92400e",fontWeight:700,flexShrink:0}}>!</span>{r}
+      </div>)}
+    </div>}
+    <div style={{background:"white",border:"1px solid #e2e8f0",borderRadius:8,padding:12}}>
+      <div style={{fontWeight:700,fontSize:12,color:"#0f172a",marginBottom:8}}>Critical Path Permits {!hasDates&&<span style={{fontWeight:400,fontSize:10,color:"#94a3b8"}}>(enter CS dates for deadlines)</span>}</div>
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:600}}>
+          <thead><tr style={{background:"#fef2f2",borderBottom:"2px solid #fecaca"}}>
+            {["Permit","Resp","Phase","Submit By","Issued ~","Rev","NTP","Urgency"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",color:"#991b1b",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {cpS.map((p,i)=>{const sd=getSub(p,form.site_cs,form.building_cs),iss=getIss(p,form.site_cs,form.building_cs),u=urg(p),uc=UC[u],rs=RS[p.resp]||RS.owner;
+            return<tr key={p.id} style={{background:i%2===0?"white":"#fff9f9",borderBottom:"1px solid #fecaca22"}}>
+              <td style={{padding:"4px 8px",fontWeight:600,color:"#0f172a",maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}{p.red_tag&&<Chip l="SWO" bg="#dc2626" c="white"/>}</td>
+              <td style={{padding:"4px 8px"}}><Chip l={rs.l} bg={rs.bg} c={rs.c}/></td>
+              <td style={{padding:"4px 8px"}}><Chip l={p.matrix==="site"?"Site":"Bldg"} bg={p.matrix==="site"?"#f0fdf4":"#eff6ff"} c={p.matrix==="site"?"#15803d":"#1e40af"}/></td>
+              <td style={{padding:"4px 8px",fontWeight:sd?600:400,color:u==="crit"?"#dc2626":u==="past"?"#7c3aed":"#0f172a",whiteSpace:"nowrap"}}>{sd?fmtD(sd):"--"}</td>
+              <td style={{padding:"4px 8px",color:"#475569",whiteSpace:"nowrap"}}>{iss?fmtD(iss):"--"}</td>
+              <td style={{padding:"4px 8px",color:"#64748b"}}>{p.rw}w</td>
+              <td style={{padding:"4px 8px",color:"#64748b"}}>{p.nw}w</td>
+              <td style={{padding:"4px 8px"}}>{hasDates&&sd?<Chip l={uc.l} bg={uc.bg} c={uc.c}/>:<span style={{color:"#94a3b8",fontSize:9}}>--</span>}</td>
+            </tr>;
+            })}
+            {cpS.length===0&&<tr><td colSpan={8} style={{padding:16,textAlign:"center",color:"#94a3b8"}}>No critical path permits in current scope.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {gaps.length>0&&<div style={{background:"white",border:"1px solid #fde68a",borderRadius:8,padding:12}}>
+      <div style={{fontWeight:700,fontSize:12,color:"#92400e",marginBottom:7}}>Gap Items -- Verify Before Scheduling <span style={{fontWeight:400,fontSize:10,color:"#b45309"}}>(click to expand)</span></div>
+      {gaps.map(p=><GapCard key={p.id} p={p}/>)}
+    </div>}
+    {stateNote&&<div style={{background:"white",border:"1px solid #e2e8f0",borderRadius:8,overflow:"hidden"}}>
+      <button onClick={()=>setShowSN(x=>!x)} style={{width:"100%",padding:"9px 12px",background:"#f8fafc",border:"none",cursor:"pointer",display:"flex",alignItems:"center",textAlign:"left"}}>
+        <span style={{fontWeight:700,fontSize:12,color:"#0f172a",flex:1}}>{form.state} -- State Regulatory Notes</span>
+        <span style={{fontSize:11,color:"#94a3b8"}}>{showSN?"▲":"▼"}</span>
+      </button>
+      {showSN&&<div style={{padding:"10px 14px",borderTop:"1px solid #e2e8f0",fontSize:11,color:"#334155",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{stateNote}</div>}
+    </div>}
+  </div>;
+}
+function MatrixGrid({permits,form,sortBy}){
+  const[expId,setExpId]=useState(null);
+  const sched=useMemo(()=>computeSchedule(permits,form.site_cs,form.building_cs),[permits,form.site_cs,form.building_cs]);
+  const pMap=Object.fromEntries(permits.map(p=>[p.id,p]));
+  const phaseOrder={site:0,building:1,substation:2,ops:3};
+  const sorted=useMemo(()=>{
+    const arr=[...permits];
+    if(sortBy==="start")arr.sort((a,b)=>{const sa=sched[a.id]?.submit||new Date(9999,0),sb=sched[b.id]?.submit||new Date(9999,0);return sa-sb;});
+    else if(sortBy==="end")arr.sort((a,b)=>{const sa=sched[a.id]?.cs||new Date(9999,0),sb=sched[b.id]?.cs||new Date(9999,0);return sa-sb;});
+    else if(sortBy==="duration")arr.sort((a,b)=>b.rw-a.rw);
+    else if(sortBy==="jurisdiction")arr.sort((a,b)=>{const o={Federal:0,State:1,Local:2};return(o[a.category]??3)-(o[b.category]??3);});
+    else if(sortBy==="sequential"){
+      const inDeg=Object.fromEntries(arr.map(p=>[p.id,0]));
+      arr.forEach(p=>p.predecessors.forEach(dep=>{if(pMap[dep])inDeg[p.id]++;}));
+      const q=arr.filter(p=>!inDeg[p.id]).map(p=>p.id);
+      const order=[];const vis=new Set(q);
+      while(q.length){const id=q.shift();order.push(id);arr.forEach(p=>{if(p.predecessors.includes(id)&&!vis.has(p.id)){inDeg[p.id]--;if(inDeg[p.id]<=0){vis.add(p.id);q.push(p.id);}}});}
+      arr.forEach(p=>{if(!vis.has(p.id))order.push(p.id);});
+      return order.map(id=>pMap[id]).filter(Boolean);
+    }
+    else arr.sort((a,b)=>{if((phaseOrder[a.matrix]??9)!==(phaseOrder[b.matrix]??9))return(phaseOrder[a.matrix]??9)-(phaseOrder[b.matrix]??9);return(a.category||"").localeCompare(b.category||"");});
+    return arr;
+  },[permits,sortBy,sched]);
+  const phC={site:"#f0fdf4",building:"#eff6ff",substation:"#faf5ff",ops:"#fff7ed"};
+  const phT={site:"#15803d",building:"#1d4ed8",substation:"#6b21a8",ops:"#92400e"};
+  const catBg2={Federal:"#fef2f2",State:"#eff6ff",Local:"#f0fdf4"};
+  const catC2={Federal:"#991b1b",State:"#1e40af",Local:"#15803d"};
+  const COLS=[
+    {h:"Permit Name",w:220,render:p=><span style={{fontWeight:600,color:"#0f172a",fontSize:11}}>{p.name}</span>},
+    {h:"Phase",w:70,render:p=><Chip l={{site:"Site",building:"Bldg",substation:"Sub",ops:"Ops"}[p.matrix]||p.matrix} bg={phC[p.matrix]||"#f1f5f9"} c={phT[p.matrix]||"#475569"}/>},
+    {h:"Category",w:70,render:p=><Chip l={p.category} bg={catBg2[p.category]||"#f1f5f9"} c={catC2[p.category]||"#475569"}/>},
+    {h:"Subcategory",w:110,render:p=><span style={{fontSize:10,color:"#475569"}}>{p.subcategory}</span>},
+    {h:"Type",w:80,render:p=><span style={{fontSize:10,color:"#64748b"}}>{p.type}</span>},
+    {h:"Resp.",w:70,render:p=>{const rs=RS[p.resp]||RS.owner;return<Chip l={rs.l} bg={rs.bg} c={rs.c}/>;}},
+    {h:"Agency",w:160,render:p=><span style={{fontSize:10,color:"#334155",display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={p.agency}>{p.agency}</span>},
+    {h:"Regulation",w:180,render:p=><RegLink p={p}/>},
+    {h:"Rev",w:40,render:p=><span style={{fontSize:10,color:"#64748b"}}>{p.rw}w</span>},
+    {h:"NTP",w:40,render:p=><span style={{fontSize:10,color:"#64748b"}}>{p.nw}w</span>},
+    {h:"Buf",w:40,render:p=><span style={{fontSize:10,color:"#64748b"}}>{p.lb}w</span>},
+    {h:"Submit By",w:95,render:p=>{const d=sched[p.id];return<span style={{fontSize:10,fontWeight:d?.submit?600:400,color:d?.constrained?"#92400e":"#0f172a",whiteSpace:"nowrap"}}>{d?.constrained&&<span style={{marginRight:2,color:"#f59e0b"}}>⟳</span>}{d?.submit?fmtD(d.submit):"--"}</span>;}},
+    {h:"Issued",w:95,render:p=>{const d=sched[p.id];return<span style={{fontSize:10,color:"#475569",whiteSpace:"nowrap"}}>{d?.issued?fmtD(d.issued):"--"}</span>;}},
+    {h:"CS/Ops",w:95,render:p=>{const d=sched[p.id];return<span style={{fontSize:10,color:"#475569",whiteSpace:"nowrap"}}>{d?.cs?fmtD(d.cs):"--"}</span>;}},
+    {h:"Basis",w:65,render:p=>{const b=basis(p);return<Chip l={b.l} bg={b.bg} c={b.c}/>;}},
+    {h:"Flags",w:70,render:p=><div style={{display:"flex",gap:2,alignItems:"center"}}>{p.critical_path&&<Chip l="CP" bg="#dc2626" c="#fff"/>}{p.red_tag&&<Chip l="SWO" bg="#ea580c" c="#fff"/>}{p.gap&&<Chip l="Gap" bg="#f59e0b" c="#fff"/>}</div>},
+    {h:"Notes",w:50,render:(p,isE)=><button onClick={e=>{e.stopPropagation();setExpId(isE?null:p.id);}} style={{padding:"1px 6px",borderRadius:3,border:"1px solid #e2e8f0",background:isE?"#eff6ff":"white",color:isE?"#2563eb":"#64748b",cursor:"pointer",fontSize:9,fontWeight:600}}>{isE?"▲":"▼"}</button>},
+  ];
+  const totalW=COLS.reduce((s,c)=>s+c.w,0)+20;
+  if(!sorted.length)return<div style={{textAlign:"center",padding:40,color:"#94a3b8",fontSize:13}}>No permits match current filters.</div>;
+  return<div style={{background:"white",border:"1px solid #e2e8f0",borderRadius:8,overflow:"hidden"}}>
+    <div style={{overflowX:"auto"}}>
+      <div style={{minWidth:totalW}}>
+        {/* Header row */}
+        <div style={{display:"flex",background:"#f1f5f9",borderBottom:"2px solid #e2e8f0",position:"sticky",top:0,zIndex:2}}>
+          {COLS.map(col=><div key={col.h} style={{width:col.w,minWidth:col.w,padding:"6px 8px",fontSize:10,fontWeight:700,color:"#475569",whiteSpace:"nowrap",flexShrink:0,borderRight:"1px solid #e2e8f0"}}>{col.h}</div>)}
+        </div>
+        {/* Data rows */}
+        {sorted.map((p,i)=>{
+          const isE=expId===p.id;
+          const d=sched[p.id]||{};
+          const leftBorder=p.critical_path?"#dc2626":p.gap?"#f59e0b":({Federal:"#dc2626",State:"#2563eb",Local:"#16a34a"}[p.category]||"#e2e8f0");
+          const preds=p.predecessors.map(id=>pMap[id]?.name||id);
+          return<React.Fragment key={p.id}>
+            <div style={{display:"flex",alignItems:"center",background:i%2===0?"white":"#fafafa",borderLeft:`3px solid ${leftBorder}`,borderBottom:"1px solid #f1f5f9",cursor:"pointer"}} onClick={()=>setExpId(isE?null:p.id)}>
+              {COLS.map(col=><div key={col.h} style={{width:col.w,minWidth:col.w,padding:"4px 8px",flexShrink:0,borderRight:"1px solid #f1f5f9",overflow:"hidden"}}>{col.render(p,isE)}</div>)}
+            </div>
+            {isE&&<div style={{background:"#f8fafc",borderLeft:"3px solid #3b82f6",borderBottom:"1px solid #e2e8f0",padding:"8px 12px"}}>
+              {p.resp==="gc"&&<div style={{background:"#faf5ff",border:"1px solid #e9d5ff",borderRadius:4,padding:"3px 8px",fontSize:9,color:"#7c3aed",fontWeight:700,marginBottom:5}}>GC SCOPE -- GC procures; shown for owner visibility only</div>}
+              {p.resp==="compliance"&&<div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:4,padding:"3px 8px",fontSize:9,color:"#0369a1",fontWeight:700,marginBottom:5}}>COMPLIANCE OBLIGATION -- no agency application required; maintain records on-site</div>}
+              {p.resp==="ops"&&<div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:4,padding:"3px 8px",fontSize:9,color:"#92400e",fontWeight:700,marginBottom:5}}>ONGOING / OPERATIONAL -- establish before operations commence</div>}
+              {d.constrained&&<div style={{background:"#fef9c3",border:"1px solid #fde68a",borderRadius:4,padding:"4px 8px",fontSize:11,color:"#92400e",fontWeight:600,marginBottom:5}}>Submit date pushed by predecessor dependency -- cannot submit until predecessor is issued.</div>}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:p.notes?6:0}}>
+                <div><div style={{fontSize:9,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Agency</div><div style={{fontSize:11,color:"#334155"}}>{p.agency}</div></div>
+                <div><div style={{fontSize:9,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Regulation</div><RegLink p={p}/></div>
+                <div><div style={{fontSize:9,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Predecessors</div><div style={{fontSize:11,color:"#334155"}}>{preds.length?preds.join(" → "):"None"}</div></div>
+              </div>
+              {p.notes&&<div style={{fontSize:11,color:"#334155",lineHeight:1.6,background:"white",border:"1px solid #e2e8f0",borderRadius:4,padding:"5px 8px"}}>{p.notes}</div>}
+              {p.gap&&<div style={{marginTop:5,background:"#fef3c7",border:"1px solid #fde68a",borderRadius:4,padding:"4px 8px",fontSize:11,color:"#92400e",fontWeight:600}}>GAP: AHJ or regulatory authority unconfirmed. Do not schedule.</div>}
+            </div>}
+          </React.Fragment>;
+        })}
+      </div>
+    </div>
+    <div style={{padding:"4px 10px",borderTop:"1px solid #e2e8f0",background:"#f8fafc",fontSize:9,color:"#94a3b8",display:"flex",gap:8}}>
+      <span>Click any row to expand details. ⟳ = submit date pushed by predecessor dependency.</span>
+      <span style={{marginLeft:"auto"}}>{sorted.length} permits</span>
+    </div>
+  </div>;
+}
+function ScheduleView({permits,form,sortBy}){
+  const[expId,setExpId]=useState(null);
+  const[view,setView]=useState("table");
+  const pMap=Object.fromEntries(permits.map(p=>[p.id,p]));
+  const hasDates=form.site_cs||form.building_cs;
+  // All hooks before any conditional returns
+  const sched=useMemo(()=>computeSchedule(permits,form.site_cs,form.building_cs),[permits,form.site_cs,form.building_cs]);
+  const phaseOrder={site:0,building:1,substation:2,ops:3};
+  const sorted=useMemo(()=>{
+    const arr=[...permits];
+    if(sortBy==="start")arr.sort((a,b)=>{const sa=sched[a.id]?.submit||new Date(9999,0),sb=sched[b.id]?.submit||new Date(9999,0);return sa-sb;});
+    else if(sortBy==="end")arr.sort((a,b)=>{const sa=sched[a.id]?.cs||new Date(9999,0),sb=sched[b.id]?.cs||new Date(9999,0);return sa-sb;});
+    else if(sortBy==="duration")arr.sort((a,b)=>b.rw-a.rw);
+    else if(sortBy==="jurisdiction")arr.sort((a,b)=>{const o={Federal:0,State:1,Local:2};return(o[a.category]??3)-(o[b.category]??3);});
+    else if(sortBy==="sequential"){
+      // Topological order (dependency-sequential)
+      const inDeg=Object.fromEntries(arr.map(p=>[p.id,0]));
+      arr.forEach(p=>p.predecessors.forEach(dep=>{if(pMap[dep])inDeg[p.id]++;}));
+      const q=arr.filter(p=>!inDeg[p.id]).map(p=>p.id);
+      const order=[];const vis=new Set(q);
+      while(q.length){const id=q.shift();order.push(id);arr.forEach(p=>{if(p.predecessors.includes(id)&&!vis.has(p.id)){inDeg[p.id]--;if(inDeg[p.id]<=0){vis.add(p.id);q.push(p.id);}}});}
+      arr.forEach(p=>{if(!vis.has(p.id))order.push(p.id);});
+      return order.map(id=>pMap[id]).filter(Boolean);
+    }
+    else arr.sort((a,b)=>{if((phaseOrder[a.matrix]??9)!==(phaseOrder[b.matrix]??9))return(phaseOrder[a.matrix]??9)-(phaseOrder[b.matrix]??9);const sa=sched[a.id]?.submit||new Date(9999,0),sb=sched[b.id]?.submit||new Date(9999,0);return sa-sb;});
+    return arr;
+  },[permits,sortBy,sched]);
+  const withDates=sorted.filter(p=>sched[p.id]?.submit&&sched[p.id]?.cs);
+  const ganttData=useMemo(()=>{
+    if(!withDates.length)return null;
+    const allD=withDates.flatMap(p=>[sched[p.id]?.submit,sched[p.id]?.issued,sched[p.id]?.cs].filter(Boolean));
+    const minD=new Date(Math.min(...allD));minD.setDate(minD.getDate()-21);
+    const maxD=new Date(Math.max(...allD));maxD.setDate(maxD.getDate()+21);
+    const totalMs=maxD-minD;const ROW=22,LW=220,CW=860;
+    const xOf=d=>Math.max(0,Math.min(CW,((d-minD)/totalMs)*CW));
+    const today=new Date();
+    const months=[];const cur=new Date(minD.getFullYear(),minD.getMonth(),1);
+    while(cur<=maxD){months.push(new Date(cur));cur.setMonth(cur.getMonth()+1);}
+    return{months,xOf,today,ROW,LW,CW,svgH:withDates.length*ROW+28,minD,maxD};
+  },[withDates.length,form.site_cs,form.building_cs]);
+  const phC={site:"#f0fdf4",building:"#eff6ff",substation:"#faf5ff",ops:"#fff7ed"};
+  const phT={site:"#15803d",building:"#1d4ed8",substation:"#6b21a8",ops:"#92400e"};
+  const phBar={site:"#16a34a",building:"#2563eb",substation:"#7c3aed",ops:"#ea580c"};
+  if(!hasDates)return<div style={{textAlign:"center",padding:60,color:"#94a3b8",fontSize:13}}>Enter Site CS and/or Building CS dates in the sidebar to generate the schedule.</div>;
+
+  const viewToggle=<div style={{display:"flex",gap:3,marginBottom:8}}>
+    {[["table","Table"],["gantt","Gantt"]].map(([v,l])=><button key={v} onClick={()=>setView(v)} style={{padding:"3px 12px",borderRadius:4,border:`1px solid ${view===v?"#2563eb":"#e2e8f0"}`,background:view===v?"#eff6ff":"white",color:view===v?"#1d4ed8":"#64748b",cursor:"pointer",fontSize:11,fontWeight:view===v?700:400}}>{l}</button>)}
+  </div>;
+
+  if(view==="gantt"){
+    if(!ganttData||!withDates.length)return<div>{viewToggle}<div style={{textAlign:"center",padding:40,color:"#94a3b8",fontSize:13}}>No permits with computable date ranges. Enter CS dates in the sidebar.</div></div>;
+    const{months,xOf,today,ROW,LW,CW,svgH,minD,maxD}=ganttData;
+    return<div>
+      {viewToggle}
+      <div style={{background:"white",border:"1px solid #e2e8f0",borderRadius:8,overflow:"hidden"}}>
+        <div style={{overflowX:"auto"}}>
+          <div style={{display:"flex",minWidth:LW+CW}}>
+            {/* Label column */}
+            <div style={{width:LW,minWidth:LW,flexShrink:0,borderRight:"1px solid #e2e8f0"}}>
+              <div style={{height:28,background:"#f8fafc",borderBottom:"1px solid #e2e8f0",display:"flex",alignItems:"center",padding:"0 8px"}}>
+                <span style={{fontSize:9,fontWeight:700,color:"#64748b",textTransform:"uppercase",letterSpacing:"0.05em"}}>Permit</span>
+              </div>
+              {withDates.map((p,i)=>{const d=sched[p.id];return<div key={p.id} style={{height:ROW,display:"flex",alignItems:"center",padding:"0 8px",borderBottom:"1px solid #f1f5f9",background:i%2===0?"white":"#fafafa",gap:4}}>
+                {p.critical_path&&<span style={{color:"#dc2626",fontSize:9,flexShrink:0}}>★</span>}
+                {d?.constrained&&<span title="Pushed by dependency" style={{color:"#f59e0b",fontSize:9,flexShrink:0}}>⟳</span>}
+                {p.gap&&<span style={{color:"#b45309",fontSize:9,flexShrink:0}}>!</span>}
+                <span style={{fontSize:9,color:"#334155",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}} title={p.name}>{p.name}</span>
+              </div>;})}
+            </div>
+            {/* Chart area */}
+            <div style={{flex:1,overflow:"hidden"}}>
+              <svg width={CW} height={svgH} style={{display:"block"}}>
+                {/* Month gridlines + labels */}
+                {months.map((m,i)=>{const x=xOf(m);return<g key={i}>
+                  <line x1={x} y1={0} x2={x} y2={svgH} stroke="#e2e8f0" strokeWidth={1}/>
+                  <text x={x+3} y={18} fontSize={9} fill="#94a3b8" fontWeight="600">{m.toLocaleDateString("en-US",{month:"short",year:"2-digit"})}</text>
+                </g>;})}
+                {today>=minD&&today<=maxD&&<g>
+                  <line x1={xOf(today)} y1={0} x2={xOf(today)} y2={svgH} stroke="#ef4444" strokeWidth={1.5} strokeDasharray="4,3"/>
+                  <text x={xOf(today)+3} y={14} fontSize={8} fill="#ef4444" fontWeight="700">TODAY</text>
+                </g>}
+                {withDates.map((p,i)=>{
+                  const d=sched[p.id];if(!d?.submit||!d?.cs)return null;
+                  const y=28+i*ROW;const bh=14;const by=y+(ROW-bh)/2;
+                  const x1=xOf(d.submit);
+                  const x2=d.issued?xOf(d.issued):x1;
+                  const x3=xOf(d.cs);
+                  const col=p.critical_path?"#dc2626":(phBar[p.matrix]||"#64748b");
+                  const reviewW=Math.max(x2-x1,3);
+                  const ntpW=Math.max(x3-x2,0);
+                  return<g key={p.id}>
+                    <rect x={x1} y={by} width={reviewW} height={bh} rx={2} fill={col} opacity={p.gap?0.45:0.85}/>
+                    {ntpW>0&&<rect x={x2} y={by+3} width={ntpW} height={bh-6} rx={1} fill={col} opacity={0.3}/>}
+                    <circle cx={x1} cy={by+bh/2} r={3} fill="white" stroke={col} strokeWidth={1.5}/>
+                    <circle cx={x3} cy={by+bh/2} r={3} fill={col}/>
+                    {d.constrained&&<line x1={x1} y1={by} x2={x1} y2={by+bh} stroke="#f59e0b" strokeWidth={2}/>}
+                  </g>;
+                })}
+              </svg>
+            </div>
+          </div>
+        </div>
+        {/* Legend */}
+        <div style={{padding:"5px 12px",borderTop:"1px solid #e2e8f0",background:"#f8fafc",display:"flex",gap:14,flexWrap:"wrap",fontSize:9,color:"#64748b"}}>
+          <span>◯ submit &nbsp;|&nbsp; dark=review &nbsp;|&nbsp; light=NTP &nbsp;|&nbsp; ●=CS/ops start</span>
+          <span style={{color:"#f59e0b"}}>⟳ dep-shifted</span>
+          <span style={{color:"#ef4444"}}>— today</span>
+          <div style={{display:"flex",gap:8,marginLeft:"auto"}}>
+            {[["site","#16a34a","Site"],["building","#2563eb","Building"],["substation","#7c3aed","Substation"],["ops","#ea580c","Ops"]].map(([k,c,l])=><span key={k} style={{display:"flex",alignItems:"center",gap:3}}><span style={{width:10,height:10,borderRadius:2,background:c,display:"inline-block",opacity:0.8}}/>{l}</span>)}
+          </div>
+        </div>
+      </div>
+    </div>;
+  }
+
+  // Table view
+  return<div>
+    {viewToggle}
+    <div style={{background:"white",border:"1px solid #e2e8f0",borderRadius:8,overflow:"hidden"}}>
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:900}}>
+          <thead><tr style={{background:"#f1f5f9",borderBottom:"2px solid #e2e8f0"}}>
+            {["Permit","Phase","Resp","Submit By","Issued","NTP End","CS/Ops","Rev","NTP","Buf","Preds","Flags"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",color:"#475569",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {sorted.map((p,i)=>{
+              const b=basis(p),rs=RS[p.resp]||RS.owner;
+              const d=sched[p.id]||{};
+              const preds=p.predecessors.map(id=>pMap[id]?.name||id);
+              const isE=expId===p.id;
+              return<React.Fragment key={p.id}>
+                <tr onClick={()=>setExpId(isE?null:p.id)} style={{background:i%2===0?"white":"#fafafa",cursor:"pointer",borderLeft:`3px solid ${p.critical_path?"#dc2626":p.gap?"#f59e0b":"#e2e8f0"}`,borderBottom:"1px solid #f1f5f9"}}>
+                  <td style={{padding:"4px 8px",fontWeight:600,color:"#0f172a",maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><span style={{color:"#94a3b8",fontSize:10,marginRight:3}}>{isE?"▼":"▶"}</span>{p.name}</td>
+                  <td style={{padding:"4px 8px"}}><Chip l={{site:"Site",building:"Bldg",substation:"Sub",ops:"Ops"}[p.matrix]||p.matrix} bg={phC[p.matrix]||"#f1f5f9"} c={phT[p.matrix]||"#475569"}/></td>
+                  <td style={{padding:"4px 8px"}}><Chip l={rs.l} bg={rs.bg} c={rs.c}/></td>
+                  <td style={{padding:"4px 8px",fontWeight:d.submit?600:400,color:d.constrained?"#92400e":"#0f172a",whiteSpace:"nowrap"}}>{d.constrained&&<span title="Pushed by predecessor" style={{marginRight:3,color:"#f59e0b"}}>⟳</span>}{d.submit?fmtD(d.submit):"--"}</td>
+                  <td style={{padding:"4px 8px",color:"#475569",whiteSpace:"nowrap"}}>{d.issued?fmtD(d.issued):"--"}</td>
+                  <td style={{padding:"4px 8px",color:"#475569",whiteSpace:"nowrap"}}>{d.ntpEnd?fmtD(d.ntpEnd):"--"}</td>
+                  <td style={{padding:"4px 8px",color:"#475569",whiteSpace:"nowrap"}}>{d.cs?fmtD(d.cs):"--"}</td>
+                  <td style={{padding:"4px 8px",color:"#64748b"}}>{p.rw}w</td>
+                  <td style={{padding:"4px 8px",color:"#64748b"}}>{p.nw}w</td>
+                  <td style={{padding:"4px 8px",color:"#64748b"}}>{p.lb}w</td>
+                  <td style={{padding:"4px 8px"}}>{preds.length>0?<span style={{fontSize:10,color:"#64748b"}} title={preds.join(", ")}>{preds.length} dep{preds.length>1?"s":""}</span>:<span style={{color:"#cbd5e1",fontSize:10}}>none</span>}</td>
+                  <td style={{padding:"4px 8px"}}><div style={{display:"flex",gap:2}}>{p.critical_path&&<span style={{color:"#dc2626",fontSize:10}}>★</span>}{p.red_tag&&<span style={{color:"#ea580c",fontSize:10}}>⚠</span>}{p.gap&&<span style={{color:"#92400e",fontSize:10}}>?</span>}<Chip l={b.l} bg={b.bg} c={b.c}/></div></td>
+                </tr>
+                {isE&&<tr style={{background:"#f8fafc",borderBottom:"1px solid #e2e8f0"}}>
+                  <td colSpan={12} style={{padding:"8px 12px"}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:6}}>
+                      <div><div style={{fontSize:9,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Agency</div><div style={{fontSize:11,color:"#334155"}}>{p.agency}</div></div>
+                      <div><div style={{fontSize:9,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Regulation</div><RegLink p={p}/></div>
+                      <div><div style={{fontSize:9,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Dependencies</div><div style={{fontSize:11,color:"#334155"}}>{preds.length?preds.join(" → "):"None"}</div></div>
+                    </div>
+                    {d.constrained&&<div style={{background:"#fef9c3",border:"1px solid #fde68a",borderRadius:4,padding:"4px 8px",fontSize:11,color:"#92400e",fontWeight:600,marginBottom:5}}>Submit date pushed later by predecessor dependency.</div>}
+                    {p.notes&&<div style={{fontSize:11,color:"#334155",lineHeight:1.6,background:"white",border:"1px solid #e2e8f0",borderRadius:4,padding:"5px 8px"}}>{p.notes}</div>}
+                  </td>
+                </tr>}
+              </React.Fragment>;
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>;
+}
+function ActionsView({permits,form}){
+  const[expId,setExpId]=useState(null);const[copied,setCopied]=useState(null);
+  const ag=AG[form.state]||AG._;
+  const floodAE=["Zone AE (100-yr)","Zone AO (Sheet Flow)","Zone VE (Coastal)","SFHA -- Other"].includes(form.floodZone);
+  const proj=form.name||"[Project Name]",loc=`${form.county||"[County]"} County, ${form.state}`;
+  const actions=useMemo(()=>{
+    const a=[];
+    permits.filter(p=>p.gap&&p.resp==="owner").forEach(p=>{a.push({id:`gap_${p.id}`,tag:"AHJ Confirm",tagBg:"#fef9c3",tagC:"#92400e",name:p.name,agency:p.agency,hi:p.critical_path,subject:`${proj} -- ${loc} -- ${p.name} -- AHJ Confirmation`,body:`Dear ${p.agency} Team,\n\nFluidStack is developing a hyperscale data center in ${loc} (Project: ${proj}). We are seeking confirmation regarding the ${p.name}:\n\n1. Is this permit required for the proposed use (hyperscale data center, ~${form.acres||"[X]"} acres)?\n2. Who is the applicable AHJ?\n3. Current estimated review timeline from submittal to issuance?\n4. Are pre-application meetings available?\n\nSincerely,\n[Name] | [Title] -- FluidStack | [Phone] | [Email]`});});
+    if(form.genOn&&form.attainment.includes("TBD"))a.push({id:"air_att",tag:"Air Quality",tagBg:"#fef9c3",tagC:"#92400e",name:"Air Quality Attainment Zone Confirmation",agency:ag.air,hi:true,subject:`${proj} -- ${loc} -- Pre-Application Air Quality Consultation`,body:`Dear ${ag.air} Team,\n\nFluidStack is developing a hyperscale data center in ${loc} (Project: ${proj}) with ${form.genCount||"multiple"} ${form.genFuel||"diesel"} emergency standby generators (${form.genKW||"TBD"} kW each)${form.btmOn?`, plus ${form.btmMW||"TBD"} MW BTM ${form.btmFuel} generation`:""}.\n\nWe request confirmation of:\n1. Current NAAQS attainment designation for ${form.county||"this"} County.\n2. Applicable NSR major source threshold (250 TPY PSD attainment vs. 100 TPY Nonattainment NSR).\n3. Recommended permitting pathway and timeline.\n4. Availability of a pre-application consultation meeting.\n\nSincerely,\n[Name] | [Title] -- FluidStack | [Phone] | [Email]`});
+    if(floodAE)a.push({id:"clomr",tag:"FEMA CLOMR",tagBg:"#fefce8",tagC:"#854d0e",name:"CLOMR Pre-Application Coordination",agency:"FEMA / Local Floodplain Administrator",hi:true,subject:`${proj} -- ${loc} -- CLOMR Pre-Application Coordination`,body:`Dear Floodplain Administrator,\n\nFluidStack is developing a data center campus in ${loc} (Project: ${proj}). The site is within a Special Flood Hazard Area (${form.floodZone}) and we anticipate needing a CLOMR prior to grading.\n\nWe request:\n1. Applicable FIRM panel(s) and current Base Flood Elevation.\n2. Local floodplain ordinance requirements beyond FEMA minimums.\n3. Community process for reviewing CLOMR applications.\n\nSincerely,\n[Name] | [Title] -- FluidStack | [Phone] | [Email]`});
+    if(form.state==="Indiana"&&form.county==="Sullivan")a.push({id:"cemetery",tag:"DHPA Cemetery",tagBg:"#fdf2f8",tagC:"#9d174d",name:"IDNR DHPA -- Cemetery Development Plan",agency:"IDNR Division of Historic Preservation and Archaeology",hi:true,subject:`${proj} -- Sullivan County, IN -- IC 14-21-1 Cemetery Coordination -- Bennett Cemetery (CR-77-36)`,body:`Dear IDNR DHPA Team,\n\nFluidStack is developing a data center campus in Sullivan County, Indiana (Project: ${proj}). Bennett Cemetery (State Site #CR-77-36) falls within or adjacent to the proposed footprint.\n\nUnder IC 14-21-1, a Cemetery Development Plan and DHPA permit are required before grading within 100 feet of the cemetery boundary. We request:\n1. Confirmation of the cemetery boundary and 100-foot buffer.\n2. Cemetery Development Plan requirements.\n3. Application form and process for the required DHPA permit.\n4. Whether a Phase Ia cultural resources survey is required.\n5. Estimated review timeline.\n\nSincerely,\n[Name] | [Title] -- FluidStack | [Phone] | [Email]`});
+    if(form.state==="Oklahoma")a.push({id:"tribal",tag:"Tribal Jurisdiction",tagBg:"#faf5ff",tagC:"#6b21a8",name:"Tribal Jurisdiction Verification (McGirt)",agency:"Oklahoma Governor Office / Applicable Tribal Nation",hi:true,subject:`${proj} -- ${loc} -- McGirt Tribal Jurisdiction Verification`,body:`Dear [Tribal Nation / State Agency],\n\nFluidStack is evaluating a data center site in ${loc} (Project: ${proj}). Following McGirt v. Oklahoma (2020), we are conducting due diligence on whether this parcel falls within tribal reservation boundaries.\n\nWe request:\n1. Whether the subject parcel (legal description: [INSERT]) falls within [Tribal Nation]'s reservation boundaries.\n2. If so, the applicable jurisdictional authority for permitting.\n3. Whether a Memorandum of Agreement with tribal government is required.\n\nSincerely,\n[Name] | [Title] -- FluidStack | [Phone] | [Email]`});
+    if(form.wetlands||form.hasStream)a.push({id:"usace_jd",tag:"USACE JD",tagBg:"#eff6ff",tagC:"#1d4ed8",name:"USACE Jurisdictional Determination -- Initiation",agency:(AG[form.state]||AG._).usace,hi:true,subject:`${proj} -- ${loc} -- CWA Jurisdictional Determination Request`,body:`Dear ${(AG[form.state]||AG._).usace} Regulatory Office,\n\nFluidStack is proposing a data center campus in ${loc} (Project: ${proj}, ~${form.acres||"TBD"} acres). Desktop review identified potential jurisdictional waters including ${[form.wetlands?"wetlands":"",form.hasStream?"stream corridors":""].filter(Boolean).join(" and ")}.\n\nWe request initiation of a Jurisdictional Determination under 33 CFR Part 331 and availability for a pre-JD site visit.\n\nSincerely,\n[Name] | [Title] -- FluidStack | [Phone] | [Email]`});
+    return a;
+  },[permits,form]);
+  const copy=(text,id)=>{navigator.clipboard.writeText(text).then(()=>{setCopied(id);setTimeout(()=>setCopied(null),2000);});};
+  if(!actions.length)return<div style={{textAlign:"center",padding:60,color:"#94a3b8"}}><div style={{fontSize:24,marginBottom:8}}>✓</div><div style={{fontSize:13}}>No gap items or unconfirmed assumptions requiring agency outreach under current configuration.</div></div>;
+  return<div style={{display:"flex",flexDirection:"column",gap:7}}>
+    <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"7px 12px",fontSize:11,color:"#1e40af"}}>{actions.length} pre-drafted email{actions.length>1?"s":""} generated. Edit before sending -- replace all [bracket] placeholders.</div>
+    {actions.map(a=>{const isE=expId===a.id;return<div key={a.id} style={{background:"white",border:`1px solid ${isE?"#bfdbfe":"#e2e8f0"}`,borderLeft:`3px solid ${a.hi?"#dc2626":"#64748b"}`,borderRadius:6,overflow:"hidden"}}>
+      <div onClick={()=>setExpId(isE?null:a.id)} style={{padding:"9px 12px",cursor:"pointer",display:"flex",alignItems:"center",gap:7}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap",marginBottom:2}}>
+            <span style={{fontWeight:700,fontSize:12,color:"#0f172a"}}>{a.name}</span>
+            <Chip l={a.tag} bg={a.tagBg} c={a.tagC}/>
+            {a.hi&&<Chip l="High Priority" bg="#fef2f2" c="#dc2626"/>}
+          </div>
+          <div style={{fontSize:10,color:"#64748b"}}>To: {a.agency}</div>
+        </div>
+        <span style={{color:"#94a3b8",fontSize:12}}>{isE?"▲":"▼"}</span>
+      </div>
+      {isE&&<div style={{borderTop:"1px solid #f1f5f9",padding:"10px 12px",background:"#f8fafc"}}>
+        <div style={{marginBottom:7}}><div style={{fontSize:9,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Subject</div><div style={{fontSize:11,color:"#334155",fontWeight:600,background:"white",border:"1px solid #e2e8f0",borderRadius:4,padding:"4px 8px"}}>{a.subject}</div></div>
+        <div style={{marginBottom:8}}><div style={{fontSize:9,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Body</div><pre style={{fontSize:11,color:"#334155",background:"white",border:"1px solid #e2e8f0",borderRadius:4,padding:"7px 9px",whiteSpace:"pre-wrap",wordBreak:"break-word",fontFamily:"system-ui,sans-serif",lineHeight:1.6,maxHeight:220,overflowY:"auto"}}>{a.body}</pre></div>
+        <button onClick={()=>copy(`Subject: ${a.subject}\n\n${a.body}`,a.id)} style={{padding:"4px 11px",borderRadius:4,border:"none",background:copied===a.id?"#15803d":"#0f172a",color:"white",cursor:"pointer",fontSize:11,fontWeight:600,marginRight:5}}>{copied===a.id?"✓ Copied!":"Copy Email"}</button>
+        <button onClick={()=>copy(a.subject,`s_${a.id}`)} style={{padding:"4px 11px",borderRadius:4,border:"1px solid #e2e8f0",background:"white",color:"#475569",cursor:"pointer",fontSize:11}}>{copied===`s_${a.id}`?"✓":"Copy Subject"}</button>
+      </div>}
+    </div>;})}
+  </div>;
+}
+function Legend(){
+  const[open,setOpen]=useState(false);
+  const groups=[
+    {l:"Jurisdiction",items:[{bg:"#fef2f2",c:"#991b1b",l:"Federal"},{bg:"#eff6ff",c:"#1e40af",l:"State"},{bg:"#f0fdf4",c:"#15803d",l:"Local"}]},
+    {l:"Responsibility",items:[{bg:"#eff6ff",c:"#1d4ed8",l:"Owner",n:"owner procures"},{bg:"#faf5ff",c:"#7c3aed",l:"GC",n:"GC procures"},{bg:"#f0f9ff",c:"#0369a1",l:"Compl.",n:"no application"},{bg:"#fff7ed",c:"#92400e",l:"Ops",n:"ongoing"}]},
+    {l:"Basis",items:[{bg:"#dcfce7",c:"#15803d",l:"Cited",n:"specific reg sourced"},{bg:"#dbeafe",c:"#1e40af",l:"Estimated",n:"professional estimate"},{bg:"#fef3c7",c:"#92400e",l:"Verify",n:"do not schedule"}]},
+    {l:"Flags",items:[{bg:"#dc2626",c:"white",l:"CP",n:"critical path"},{bg:"#ea580c",c:"white",l:"SWO",n:"stop-work risk"},{bg:"#f59e0b",c:"white",l:"Gap",n:"AHJ unconfirmed"}]},
+    {l:"Urgency",items:[{bg:"#1e293b",c:"white",l:"Overdue"},{bg:"#fef2f2",c:"#dc2626",l:"Urgent",n:"<30d"},{bg:"#fef9c3",c:"#92400e",l:"Soon",n:"<90d"},{bg:"#f0fdf4",c:"#15803d",l:"Upcoming"}]},
+  ];
+  return<div style={{borderTop:"1px solid #e2e8f0",background:"white",flexShrink:0}}>
+    <button onClick={()=>setOpen(x=>!x)} style={{width:"100%",padding:"4px 14px",background:"#f8fafc",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:6,textAlign:"left"}}>
+      <span style={{fontSize:9,fontWeight:700,color:"#64748b",textTransform:"uppercase",letterSpacing:"0.05em"}}>Legend</span>
+      <span style={{fontSize:9,color:"#94a3b8"}}>{open?"▲":"▼"}</span>
+    </button>
+    {open&&<div style={{padding:"8px 14px 10px",display:"flex",gap:16,flexWrap:"wrap",borderTop:"1px solid #f1f5f9",background:"#f8fafc"}}>
+      {groups.map(g=><div key={g.l}>
+        <div style={{fontSize:8,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>{g.l}</div>
+        <div style={{display:"flex",flexDirection:"column",gap:3}}>
+          {g.items.map(item=><div key={item.l} style={{display:"flex",alignItems:"center",gap:4}}>
+            <Chip l={item.l} bg={item.bg} c={item.c}/>
+            {item.n&&<span style={{fontSize:9,color:"#64748b"}}>{item.n}</span>}
+          </div>)}
+        </div>
+      </div>)}
+    </div>}
+  </div>;
+}
+function Percy(){
+  const[form,setForm]=useState(INIT);
+  const[filterCat,setFilterCat]=useState("All");
+  const[filterMatrix,setFilterMatrix]=useState("All");
+  const[filterResp,setFilterResp]=useState("All");
+  const[filterSub,setFilterSub]=useState("All");
+  const[showGaps,setShowGaps]=useState(false);
+  const[showCP,setShowCP]=useState(false);
+  const[showRT,setShowRT]=useState(false);
+  const[sortBy,setSortBy]=useState("default");
+  const[tab,setTab]=useState("summary");
+  const[subTab,setSubTab]=useState("matrix");
+  const[expanded,setExpanded]=useState(null);
+  const upd=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const updCounty=c=>setForm(f=>{const db=(ADB[f.state]||{})[c];return{...f,county:c,...(db?{attainment:db.s}:{})};});
+  const updState=s=>setForm(f=>({...f,state:s,county:"",attainment:INIT.attainment}));
+  const stateCounties=useMemo(()=>Object.keys(ADB[form.state]||{}),[form.state]);
+  const attAuto=useMemo(()=>(ADB[form.state]||{})[form.county]||null,[form.state,form.county]);
+  const permits=useMemo(()=>buildPermits(form),[form]);
+  const subcats=useMemo(()=>["All",...Array.from(new Set(permits.map(p=>p.subcategory))).sort()],[permits]);
+  const filtered=useMemo(()=>permits.filter(p=>{
+    if(filterCat!=="All"&&p.category!==filterCat)return false;
+    if(filterMatrix!=="All"&&p.matrix!==filterMatrix)return false;
+    if(filterResp!=="All"&&p.resp!==filterResp)return false;
+    if(filterSub!=="All"&&p.subcategory!==filterSub)return false;
+    if(showGaps&&!p.gap)return false;if(showCP&&!p.critical_path)return false;if(showRT&&!p.red_tag)return false;
+    return true;
+  }),[permits,filterCat,filterMatrix,filterResp,filterSub,showGaps,showCP,showRT]);
+  const hasFilter=filterCat!=="All"||filterMatrix!=="All"||filterResp!=="All"||filterSub!=="All"||showGaps||showCP||showRT||sortBy!=="default";
+  const clearFilter=()=>{setFilterCat("All");setFilterMatrix("All");setFilterResp("All");setFilterSub("All");setShowGaps(false);setShowCP(false);setShowRT(false);setSortBy("default");};
+  const stateNote=SNOTES[form.state];
+  const TABS=[["summary","Summary"],["permits","Permits"]];
+  return<div style={{display:"flex",flexDirection:"column",height:"100vh",fontFamily:"system-ui,sans-serif",background:"#f8fafc"}}>
+    <div style={{background:"#0f172a",color:"white",padding:"9px 14px",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+      <b style={{fontSize:16,letterSpacing:"-.5px"}}>PERCY</b>
+      <span style={{fontSize:10,color:"#94a3b8"}}>Permit Matrix + Regulatory Compliance</span>
+      <div style={{display:"flex",gap:4,marginLeft:"auto"}}>
+        {TABS.map(([t,l])=><button key={t} onClick={()=>setTab(t)} style={{padding:"3px 10px",borderRadius:4,border:"none",cursor:"pointer",fontSize:11,fontWeight:600,background:tab===t?"#3b82f6":"#1e293b",color:tab===t?"white":"#94a3b8"}}>{l}</button>)}
+      </div>
+    </div>
+    <div style={{background:"white",borderBottom:"1px solid #e2e8f0",padding:"4px 12px",display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",flexShrink:0}}>
+      <label style={{display:"flex",alignItems:"center",gap:3,fontSize:11,color:"#64748b"}}>Category<select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={{padding:"2px 4px",border:"1px solid #e2e8f0",borderRadius:4,fontSize:11,background:"#f8fafc",marginLeft:3}}><option>All</option><option>Federal</option><option>State</option><option>Local</option></select></label>
+      <label style={{display:"flex",alignItems:"center",gap:3,fontSize:11,color:"#64748b"}}>Phase<select value={filterMatrix} onChange={e=>setFilterMatrix(e.target.value)} style={{padding:"2px 4px",border:"1px solid #e2e8f0",borderRadius:4,fontSize:11,background:"#f8fafc",marginLeft:3}}><option>All</option><option>site</option><option>building</option><option>substation</option><option>ops</option></select></label>
+      <label style={{display:"flex",alignItems:"center",gap:3,fontSize:11,color:"#64748b"}}>Resp.<select value={filterResp} onChange={e=>setFilterResp(e.target.value)} style={{padding:"2px 4px",border:"1px solid #e2e8f0",borderRadius:4,fontSize:11,background:"#f8fafc",marginLeft:3}}><option>All</option><option>owner</option><option>gc</option><option>compliance</option><option>ops</option></select></label>
+      <label style={{display:"flex",alignItems:"center",gap:3,fontSize:11,color:"#64748b"}}>Type<select value={filterSub} onChange={e=>setFilterSub(e.target.value)} style={{padding:"2px 4px",border:"1px solid #e2e8f0",borderRadius:4,fontSize:11,background:"#f8fafc",marginLeft:3}}>{subcats.map(o=><option key={o}>{o}</option>)}</select></label>
+      {[["Gaps",showGaps,()=>setShowGaps(x=>!x),"#92400e"],["CP",showCP,()=>setShowCP(x=>!x),"#dc2626"],["Red Tag",showRT,()=>setShowRT(x=>!x),"#ea580c"]].map(([l,a,fn,c])=><button key={l} onClick={fn} style={{padding:"2px 8px",borderRadius:4,border:`1px solid ${a?c:"#e2e8f0"}`,background:a?c:"white",color:a?"white":"#64748b",cursor:"pointer",fontSize:11}}>{l}</button>)}
+      <label style={{display:"flex",alignItems:"center",gap:3,fontSize:11,color:"#64748b",marginLeft:4}}>Sort<select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{padding:"2px 4px",border:"1px solid #e2e8f0",borderRadius:4,fontSize:11,background:sortBy!=="default"?"#eff6ff":"#f8fafc",color:sortBy!=="default"?"#1d4ed8":"inherit",marginLeft:3}}><option value="default">Default</option><option value="start">Start Date</option><option value="sequential">Sequential</option><option value="end">End Date</option><option value="jurisdiction">Jurisdiction</option><option value="duration">Duration</option></select></label>
+      <span style={{marginLeft:"auto",fontSize:11,color:"#64748b"}}>{filtered.length}/{permits.length}</span>
+      {hasFilter&&<button onClick={clearFilter} style={{padding:"2px 7px",borderRadius:4,border:"1px solid #e2e8f0",background:"white",cursor:"pointer",fontSize:11,color:"#dc2626"}}>✕ Clear</button>}
+    </div>
+    <div style={{display:"flex",flex:1,overflow:"hidden"}}>
+      <div style={{width:275,minWidth:275,background:"white",borderRight:"1px solid #e2e8f0",overflowY:"auto",padding:"9px",flexShrink:0,fontSize:12}}>
+        <label style={{display:"block",marginBottom:4}}><span style={{color:"#475569",display:"block",marginBottom:1}}>Project Name</span><input value={form.name} onChange={e=>upd("name",e.target.value)} style={{...inp}} placeholder="e.g. Project Nova"/></label>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,marginBottom:4}}>
+          <label style={{display:"block"}}><span style={{color:"#475569",display:"block",marginBottom:1}}>State</span><select value={form.state} onChange={e=>updState(e.target.value)} style={inp}>{STATES.map(s=><option key={s}>{s}</option>)}</select></label>
+          <label style={{display:"block"}}><span style={{color:"#475569",display:"block",marginBottom:1}}>County</span><select value={form.county} onChange={e=>updCounty(e.target.value)} style={inp}>{stateCounties.length>0?stateCounties.map(c=><option key={c}>{c}</option>):<option value={form.county||""}>{form.county||"[enter]"}</option>}</select></label>
+        </div>
+        {attAuto&&<div style={{background:attAuto.s.includes("Non-attainment")?"#fef2f2":"#f0fdf4",border:`1px solid ${attAuto.s.includes("Non-attainment")?"#fecaca":"#bbf7d0"}`,borderRadius:4,padding:"4px 7px",marginBottom:4,fontSize:10}}><div style={{fontWeight:700,color:attAuto.s.includes("Non-attainment")?"#991b1b":"#15803d",marginBottom:1}}>Auto-detected: {attAuto.s.includes("Non-attainment")?"NON-ATTAINMENT":"ATTAINMENT"}</div><div style={{color:"#475569"}}>{attAuto.n}</div></div>}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,marginBottom:4}}>
+          <label style={{display:"block"}}><span style={{color:"#475569",display:"block",marginBottom:1}}>Site CS</span><input type="date" value={form.site_cs} onChange={e=>upd("site_cs",e.target.value)} style={inp}/></label>
+          <label style={{display:"block"}}><span style={{color:"#475569",display:"block",marginBottom:1}}>Bldg CS</span><input type="date" value={form.building_cs} onChange={e=>upd("building_cs",e.target.value)} style={inp}/></label>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,marginBottom:6}}>
+          <label style={{display:"block"}}><span style={{color:"#475569",display:"block",marginBottom:1}}>Acres</span><input value={form.acres} onChange={e=>upd("acres",e.target.value)} style={inp}/></label>
+          <label style={{display:"block"}}><span style={{color:"#475569",display:"block",marginBottom:1}}>Bldg SF</span><input value={form.sf} onChange={e=>upd("sf",e.target.value)} style={inp}/></label>
+        </div>
+        <SH label="Scope"/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:2,marginBottom:5}}>
+          {[["scopeSite","Site/Civil"],["scopeBuilding","Building"],["scopeSubstation","Substation"],["scopeOps","Operations"]].map(([k,l])=><label key={k} style={{display:"flex",alignItems:"center",gap:3,cursor:"pointer",padding:"3px 5px",border:`1px solid ${form[k]?"#3b82f6":"#e2e8f0"}`,borderRadius:4,background:form[k]?"#eff6ff":"white"}}><input type="checkbox" checked={!!form[k]} onChange={e=>upd(k,e.target.checked)} style={{margin:0}}/><span style={{fontSize:11,fontWeight:form[k]?600:400,color:form[k]?"#1d4ed8":"#475569"}}>{l}</span></label>)}
+        </div>
+        <SF label="Flood Zone" k="floodZone" form={form} upd={upd} opts={["Zone X (Minimal)","Zone AE (100-yr)","Zone AO (Sheet Flow)","Zone VE (Coastal)","Zone X-500 (500-yr)","SFHA -- Other","No FEMA Mapping","TBD"]}/>
+        <CF label="Has Floodway" k="hasFloodway" form={form} upd={upd}/>
+        <SF label="Brownfield" k="brownfield" form={form} upd={upd} opts={["No","Yes -- Enrolled in BCP","Yes -- Prior ASTM Phase II","Yes -- Remediation Complete","Yes -- Active Remediation","TBD"]}/>
+        <SF label="Zoning" k="zoning" form={form} upd={upd} opts={["By-Right Data Center","Heavy Industrial (HI)","Light Industrial (LI)","General Industrial","Commercial","Agricultural","Mixed Use","Requires CUP","Requires Rezoning","TBD"]}/>
+        <SF label="Cultural Resources" k="cultural" form={form} upd={upd} opts={["TBD","No Known Resources","Survey Required","SHPO Consultation Required","Section 106 Triggered","Avoidance Required"]}/>
+        <SF label="Airport Proximity" k="airport" form={form} upd={upd} opts={["None Within 5 mi","Within 5 mi -- FAA Review Required","Within 3 mi -- Height Restricted","Within 1 mi -- FAA 7460 Required"]}/>
+        <SF label="Sensitive Receptors" k="receptors" form={form} upd={upd} opts={["None","Residential -- Adjacent","School","Hospital Nearby","Environmental Justice Community","EJ + Residential","TBD"]}/>
+        <SF label="Rock / Bedrock" k="rock" form={form} upd={upd} opts={["TBD","No","Yes -- Depth TBD","Yes -- < 5 ft","Yes -- 5-15 ft","Yes -- > 15 ft"]}/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:2,marginBottom:4}}>
+          {[["wetlands","Wetlands"],["hasStream","Stream"],["species","Species"],["hasDemo","Demo"],["hasPre1978","Pre-1978"],["traffic","Traffic"],["waterMainReloc","Water Reloc"],["gasExtension","Gas Ext."],["railroadCrossing","RR Cross."]].map(([k,l])=><CF key={k} label={l} k={k} form={form} upd={upd}/>)}
+        </div>
+        <SH label="Utilities"/>
+        <SF label="Power Source" k="power" form={form} upd={upd} opts={["Dedicated Utility Substation","Utility Grid -- Single Feed","Utility Grid -- Dual Feed","Utility Grid + On-Site Gen","Renewable PPA + Grid","TBD"]}/>
+        <SF label="Tx Voltage" k="txV" form={form} upd={upd} opts={["138 kV","115 kV","161 kV","230 kV","345 kV","500 kV","765 kV","Distribution (< 35 kV)","TBD"]}/>
+        <SF label="Water / Sewer" k="waterSewer" form={form} upd={upd} opts={["TBD","Adequate -- Confirmed","Adequate -- Unconfirmed","Requires Extension","Requires New Infrastructure","Constrained -- Mitigation Required"]}/>
+        <SF label="Water Source" k="waterSource" form={form} upd={upd} opts={["TBD","Municipal / Public Water Supply","Private Groundwater Well","Surface Water Withdrawal","Multiple Sources"]}/>
+        <SF label="Process Discharge" k="processDischarge" form={form} upd={upd} opts={["TBD","Sanitary Sewer (POTW)","Municipal Stormwater System","Direct Surface Water Discharge","On-site Infiltration / No Direct Discharge"]}/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:2,marginBottom:4}}>
+          {[["hasCoolingTower","Cooling Tower"],["hasDewater","Dewater"],["hasUST","UST"],["hasOutdoorIndustrial","Outdoor Ind."],["hasRO","RO System"],["hasLargeCoolant","Large Coolant"],["hasPCBRisk","PCB Risk"]].map(([k,l])=><CF key={k} label={l} k={k} form={form} upd={upd}/>)}
+        </div>
+        <SH label="Energy Storage (BESS)"/>
+        <SF label="Battery / Storage Type" k="bess" form={form} upd={upd} opts={["BESS","None","UPS Only","BBU Only","BESS + UPS"]}/>
+        <SH label="Generators"/>
+        <CF label="Generators On-Site" k="genOn" form={form} upd={upd}/>
+        {form.genOn&&<>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:3,marginTop:2,marginBottom:2}}>
+            <label style={{display:"block"}}><span style={{color:"#475569",display:"block",marginBottom:1}}>Count</span><input value={form.genCount} onChange={e=>upd("genCount",e.target.value)} style={inp}/></label>
+            <label style={{display:"block"}}><span style={{color:"#475569",display:"block",marginBottom:1}}>kW ea.</span><input value={form.genKW} onChange={e=>upd("genKW",e.target.value)} style={inp}/></label>
+            <label style={{display:"block"}}><span style={{color:"#475569",display:"block",marginBottom:1}}>Diesel gal</span><input value={form.dieselGal} onChange={e=>upd("dieselGal",e.target.value)} style={inp} placeholder="e.g. 5000"/></label>
+          </div>
+          <SF label="Fuel" k="genFuel" form={form} upd={upd} opts={["Diesel","Natural gas","Dual fuel"]}/>
+          <SF label="Usage Type" k="genUsage" form={form} upd={upd} opts={["Emergency standby (100 hrs/yr max)","Non-emergency / BTM / continuous"]}/>
+        </>}
+        <SH label="BTM Generation"/>
+        <CF label="BTM Generation On-Site" k="btmOn" form={form} upd={upd}/>
+        {form.btmOn&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3,marginTop:2}}>
+          <label style={{display:"block"}}><span style={{color:"#475569",display:"block",marginBottom:1}}>Capacity (MW)</span><input value={form.btmMW} onChange={e=>upd("btmMW",e.target.value)} style={inp}/></label>
+          <SF label="Fuel" k="btmFuel" form={form} upd={upd} opts={["Natural gas","Diesel","Dual fuel"]}/>
+        </div>}
+        <SH label="Air Quality"/>
+        <SF label="Attainment Zone" k="attainment" form={form} upd={upd} opts={["TBD -- confirm with air quality consultant","Attainment zone (250 TPY PSD threshold)","Non-attainment zone (100 TPY NSR threshold)"]}/>
+        <button onClick={()=>setForm(INIT)} style={{width:"100%",marginTop:8,padding:"4px",borderRadius:4,border:"1px solid #e2e8f0",background:"#f8fafc",cursor:"pointer",fontSize:11,color:"#64748b"}}>Reset to Defaults</button>
+      </div>
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{flex:1,overflowY:"auto",padding:"10px 12px"}}>
+          {tab==="summary"&&<ExecSummary permits={filtered} form={form} stateNote={stateNote}/>}
+          {tab==="permits"&&<div style={{display:"flex",flexDirection:"column",height:"100%"}}>
+            <div style={{display:"flex",gap:0,borderBottom:"1px solid #e2e8f0",marginBottom:10,flexShrink:0}}>
+              {[["matrix","Matrix"],["schedule","Schedule"]].map(([s,l])=><button key={s} onClick={()=>setSubTab(s)} style={{padding:"5px 16px",border:"none",borderBottom:`2px solid ${subTab===s?"#3b82f6":"transparent"}`,background:"transparent",cursor:"pointer",fontSize:12,fontWeight:subTab===s?700:400,color:subTab===s?"#1d4ed8":"#64748b"}}>{l}</button>)}
+            </div>
+            {subTab==="matrix"&&<MatrixGrid permits={filtered} form={form} sortBy={sortBy}/>}
+            {subTab==="schedule"&&<ScheduleView permits={filtered} form={form} sortBy={sortBy}/>}
+          </div>}
+        </div>
+        <Legend/>
+      </div>
+    </div>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(Percy));
+</script>
+</body>
+</html>
